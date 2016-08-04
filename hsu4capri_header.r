@@ -14,7 +14,6 @@ library(gdxrrw)
 #library(foreign)
 
 
-
 #Set working directory and load of general (used to update all) datasets.
 # These databases have been updated by Renate Koeble and delivered in the folder capri/hsu2_database_update_2016_02
 if(Sys.info()[4]=="L01RI1203587"){ #checks machine name
