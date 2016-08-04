@@ -84,6 +84,7 @@ func1 <- function(x, functs, vbles, ...){
   
   colnames(x.nuts3)[1] <- "spatunit"  #changing 1st column name
   
+  
   ## Computing statistics per CAPRI NUTS II ##
   
   print("Computing statistics per CAPRI NUTS II...")
@@ -125,7 +126,6 @@ func1 <- function(x, functs, vbles, ...){
   x.hsu.nuts2_noNA <- x.hsu.nuts2[complete.cases(x.hsu.nuts2$Spatial_unit), ]  # to remove NA's
   x.hsu.nuts2_noNA <- as.data.frame(x.hsu.nuts2_noNA)
   
-  #functs <- c("max", "min", "weighted.mean", "sd", "median")
   x.hsu.nuts2_longDF <- data.frame()
   for (fct in 1:length(functs)){                        #This is to stack the DataFrame in order to have a "long" format table, appropriate to be transformed to a gsx
     
@@ -153,7 +153,7 @@ func1 <- function(x, functs, vbles, ...){
   
   #symDim <- 3
   symDim <- length(vbles) + 1 
-  nm_table <- deparse(substitute(x))
+  nm_table <- deparse(substitute(x))   # to extract the name of the table
   attr(x.hsu.nuts2_longDF,"symName") <- nm_table
   #attr(dem.hsu.nuts2_longDF, "ts") <- "DEM per spatial unit"   #explanatory text for the symName
   myText <- c("spatial entity", "statistics")     # explanatory text for the extracted index sets
@@ -161,7 +161,7 @@ func1 <- function(x, functs, vbles, ...){
   lst <- wgdx.reshape(x.hsu.nuts2_longDF, symDim, tName = "stats", setNames = myText)   #to reshape the DT before to write the gdx. tName is the index set name for the new index position created by reshaping 
   
   #wgdx.lst("forest.hsu.nuts2_kk2.gdx", lst)
-  wgdx.lst(paste0(nm_table, ".hsu.nuts2_kk3.gdx"), lst)
+  wgdx.lst(paste0(nm_table, ".hsu.nuts2.gdx"), lst)
   
   
   print("End of Function 1")
@@ -173,6 +173,9 @@ func1 <- function(x, functs, vbles, ...){
   
   
 }   
+
+
+
 
 ## Function 2.1: Multifunction used in func2 to compute several HSU - USCIE statistics 
 
@@ -206,6 +209,9 @@ func2 <- function(x){
   
 }  # End of Function 2
 
+
+
+
 ## Input 1: USCIE-HSU2 table
 # It relates USCIE codes with HSU2 codes
 #coming from USCIE_HSU2.CSV. Reading the file directly from the CSV with fread(). 
@@ -213,11 +219,26 @@ hsu_uscie1 <- fread("USCIE_HSU2.csv", header=TRUE) # fread() function is much fa
 # You get a DataTable
 names(hsu_uscie1) <- c("s_uscierc","s_hsu2")
 setkey(hsu_uscie1, "s_uscierc") # to set a key column of the DataTable
-#export as gdx
-
+#export as gdx       xavi: How can I export as gdx without data? THer are only two columns (uscie and hsu codes) 
 #str(hsu_uscie1)
 #head(hsu_uscie1)
-#tables()
+
+#Export to a gdx file
+
+hsu_uscie2 <- as.data.frame(hsu_uscie1)
+#hsu_uscie1[is.na(hsu_uscie1)] <- 0    #to convert all NA's to 0
+symDim <- 2
+attr(hsu_uscie2,"symName") <- "hsu_uscie"
+attr(hsu_uscie2, "ts") <- "relates HSU2 codes USCIE codes"   #explanatory text for the symName
+#myText <- c("hsu2 code", "uscie code")     # explanatory text for the extracted index sets
+#lst <- wgdx.reshape(hsu2.nuts, symDim, tName = "area", order=c(2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+lst <- wgdx.reshape(hsu_uscie2, symDim, order=c(2,1,0))   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+wgdx.lst("hsu2_uscie1", lst)
+
+remove(hsu_uscie2)
+
+
+
 
 
 ## Input 2: HSU2-NUTS-CAPRI
@@ -234,9 +255,17 @@ load(file = "hsu2.nuts.rdata")
 hsu2.nutsDT <- as.data.table(hsu2.nuts) # to transform hsu2.nuts to a DataTable
 hsu2.nutsDT$hsu2 <- factor(hsu2.nutsDT$hsu2) # to transform the column to factor
 setkey(hsu2.nutsDT, "hsu2") # to set a key column
-#export as gdx
+
+#Export to a gdx file
+
+hsu2.nuts <- hsu2.nuts[complete.cases(hsu2.nuts), ]  # to remove NA's
+symDim <- 7
+attr(hsu2.nuts,"symName") <- "hsu_nuts_capri"
+attr(hsu2.nuts, "ts") <- "relates HSU2 codes (and areas) with NUTS2, CAPRI_NUTSII, CAPRI_NUTS0"   #explanatory text for the symName
+myText <- c("country code","nuts2 code of capri","nuts2 code","soil mapping unit","nuts3 code","hsu2 code","area of hsu2")     # explanatory text for the extracted index sets
+lst <- wgdx.reshape(hsu2.nuts, symDim, tName = "area", order=c(7,6,5,4,3,1,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+wgdx.lst("hsu2_nuts1", lst)
+
 rm(hsu2.nuts)
 #str(hsu2.nutsDT)
 #head(hsu2.nutsDT)
-#tables()
-#
