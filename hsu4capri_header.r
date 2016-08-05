@@ -39,127 +39,201 @@ igdx(gamspath)
 
 
 
-## Function 1: Computing statistics per HSU, NUTS 3-2-0
+## Function 1: Computing statistics per HSU, NUTS 3-2-0.
+# 
 # NOTES FOR THIS FUNCTION: 
-# The first argument is the data table
+# The first argument (x) is the data table
+# data2ag is to define the original data to be aggregated (i.e. uscie or hsu)
+#    xavi: the data which I've been working with is based on USCIE,
+#          so it makes no sense to compute weighted mean.
+#          However, I've split the function in two parts: 
+#          the first (if data2ag == "uscie") to compute statistics 
+#          aggregating USCIE data (as done so far), and the second 
+#          (if data2ag == "uscie") to aggragate data by HSU.
+#          Do we have data (forest, dem, etc.) at HSU level to check
+#          if the second part of the function is working properly? 
+#          I think that there is still a problem with weighted mean.
 # Pass the functions (statistics) to be computed as arguments (e.g. functs = c("weighted.mean", "max"))
 # Pass the variables to compute (e.g. vbles = c("f_2000", "f_2006"))
 # If desired, provide na.rm = TRUE
 # If weighted mean wants to be computed, in the data table must be one column called "area". 
-#    If it is not provided, an error message is issued and the function stops
+# If it is not provided, an error message is issued and the function stops
 
-func1 <- function(x, functs, vbles, ...){
+func1 <- function(x, data2ag, functs, vbles, ...){
   
   start <- Sys.time()
   
   print("Preparing to compute statistics...")
   
-  # A) Check if a weighted mean is calculated - set the HSMU area as weighting parameter
-  for (i in 1:length(functs)){   # this loop is to add the argument "area", nedded to compute weighted mean
-    if (functs[i] == "weighted.mean"){      # this is to tell the function how to compute weighted mean
-      functs[i] <- "weighted.mean(., area)"   
-      if(!"area" %in% colnames(x)) stop("please, provide a column called 'area' with areas", call. = FALSE)   # If a column called "area" with areas is not provided, an error message is issued and the function stops
-    } else {
-      functs[i] <- functs[i]
+  if(tolower(data2ag) == "uscie"){
+    
+    # A) Check if a weighted mean is passed, it wouldn't make sense for USCIE data
+    
+    if(any(functs == "weighted.mean")) stop("It makes no sense to compute weighted mean for USCIE data", call. = FALSE)
+    
+    
+    
+    ## computing statistics per HSU ##
+    print("Computing statistics per HSU...")
+    
+    # B) 
+    by_hsu2 <- x %>% group_by(hsu2)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
+    x.hsu <- by_hsu2 %>% summarise_at(vbles, functs, ...)    # summarise_at() is a new function included in the new Dev version of dplyr. It will replace the old summarise_each()
+    
+    colnames(x.hsu)[1] <- "s_spatunit"  #changing 1st column name
+    x.hsu$s_spatunit <- paste0("U", x.hsu$s_spatunit) #adding "U" in front of spatial units
+    
+    
+    ## Computing statistics per NUTS 3 ##
+    print("Computing statistics per NUTS III...")
+    
+    by_nuts3 <- x %>% group_by(nuts3)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
+    x.nuts3 <- by_nuts3 %>% summarise_at(vbles, functs, ...)
+    
+    colnames(x.nuts3)[1] <- "s_spatunit"  #changing 1st column name
+    
+    
+    ## Computing statistics per CAPRI NUTS II ##
+    
+    print("Computing statistics per CAPRI NUTS II...")
+    
+    
+    by_CAPRI_NUTSII <- x %>% group_by(CAPRI_NUTSII)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
+    x.caprinuts <- by_CAPRI_NUTSII %>% summarise_at(vbles, functs, ...)
+    
+    colnames(x.caprinuts)[1] <- "s_spatunit"  #changing 1st column name
+    
+    
+    
+    ## Computing statistics per country (CAPRI NUTS 0) ##
+    
+    print("Computing statistics per country (CAPRI NUTS 0...)")
+    
+    
+    by_CAPRI_NUTS0 <- x %>% group_by(CAPRI_NUTS0)           #grouping the DataTable before to be passed to the summarise_at(), to be faster
+    x.country <- by_CAPRI_NUTS0 %>% summarise_at(vbles, functs, ...)
+    
+    colnames(x.country)[1] <- "s_spatunit"  #changing 1st column name
+    
+    
+    
+    ## Combining by rows ##
+    
+    print("Creating a table with the results...")
+    
+    x.hsu.nuts2 <- rbind(x.hsu, x.nuts3, x.caprinuts, x.country)
+    
+    
+    
+  
+
+  }else if(tolower(data2ag) == "hsu"){
+    
+    
+    # A) Check if a weighted mean is calculated - set the HSMU area as weighting parameter
+    for (i in 1:length(functs)){   # this loop is to add the argument "area", nedded to compute weighted mean
+      if (functs[i] == "weighted.mean"){      # this is to tell the function how to compute weighted mean
+        functs[i] <- "weighted.mean(., area)"   
+        if(!"area" %in% colnames(x)) stop("please, provide a column called 'area' with areas", call. = FALSE)   # If a column called "area" with areas is not provided, an error message is issued and the function stops
+      } else {
+        functs[i] <- functs[i]
+      }
     }
+    
+    
+    ## Computing statistics per NUTS III ##
+    print("Computing statistics per NUTS III...")
+    
+    by_nuts3 <- x %>% group_by(nuts3)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
+    x.nuts3 <- by_nuts3 %>% summarise_at(vbles, functs, ...)
+    
+    colnames(x.nuts3)[1] <- "s_spatunit"  #changing 1st column name
+    
+    
+    ## Computing statistics per CAPRI NUTS II ##
+    
+    print("Computing statistics per CAPRI NUTS II...")
+    
+    
+    by_CAPRI_NUTSII <- x %>% group_by(CAPRI_NUTSII)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
+    x.caprinuts <- by_CAPRI_NUTSII %>% summarise_at(vbles, functs, ...)
+    
+    colnames(x.caprinuts)[1] <- "s_spatunit"  #changing 1st column name
+    
+    
+    
+    
+    ## Computing statistics per country (CAPRI NUTS 0) ##
+    
+    print("Computing statistics per country (CAPRI NUTS 0...)")
+    
+    
+    by_CAPRI_NUTS0 <- x %>% group_by(CAPRI_NUTS0)           #grouping the DataTable before to be passed to the summarise_at(), to be faster
+    x.country <- by_CAPRI_NUTS0 %>% summarise_at(vbles, functs, ...)
+    
+    colnames(x.country)[1] <- "s_spatunit"  #changing 1st column name
+    
+    
+    
+    ## Combining by rows ##
+    
+    print("Creating a table with the results...")
+    
+    x.hsu.nuts2 <- rbind(x.hsu, x.nuts3, x.caprinuts, x.country)
+    
+    
+    
+
+    
+  }else{
+    stop("Please, provide a correct value for the argument data2ag (i.e. uscie or hsu)", call. = FALSE)
   }
   
-  ## computing statistics per HSU ##
-  print("Computing statistics per HSU...")
-  
-  # B) 
-  by_hsu2 <- x %>% group_by(hsu2)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
-  x.hsu <- by_hsu2 %>% summarise_at(vbles, functs, ...)    # summarise_at() is a new function included in the new Dev version of dplyr. It will replace the old summarise_each()
-  
-  colnames(x.hsu)[1] <- "spatunit"  #changing 1st column name
-  x.hsu$spatunit <- paste0("U", x.hsu$spatunit) #adding "U" in front of spatial units
-  
-  
-  ## Computing statistics per NUTS 3 ##
-  print("Computing statistics per NUTS 3...")
-  
-  by_nuts3 <- x %>% group_by(nuts3)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
-  x.nuts3 <- by_nuts3 %>% summarise_at(vbles, functs, ...)
-  
-  colnames(x.nuts3)[1] <- "spatunit"  #changing 1st column name
-  
-  
-  ## Computing statistics per CAPRI NUTS II ##
-  
-  print("Computing statistics per CAPRI NUTS II...")
-  
-  
-  by_CAPRI_NUTSII <- x %>% group_by(CAPRI_NUTSII)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
-  x.caprinuts <- by_CAPRI_NUTSII %>% summarise_at(vbles, functs, ...)
-  
-  colnames(x.caprinuts)[1] <- "spatunit"  #changing 1st column name
-  
-  
-  
-  
-  ## Computing statistics per country (CAPRI NUTS 0) ##
-  
-  print("Computing statistics per country (CAPRI NUTS 0...)")
-  
-  
-  by_CAPRI_NUTS0 <- x %>% group_by(CAPRI_NUTS0)           #grouping the DataTable before to be passed to the summarise_at(), to be faster
-  x.country <- by_CAPRI_NUTS0 %>% summarise_at(vbles, functs, ...)
-  
-  colnames(x.country)[1] <- "spatunit"  #changing 1st column name
-  
-  
-  
-  ## Combining by rows ##
-  
-  print("Creating a table with the results...")
-  
-  x.hsu.nuts2 <- rbind(x.hsu, x.nuts3, x.caprinuts, x.country)
-  
-  
+
   
   ## Exporting to a gdx file with ##
   
   print("Exporting to a gdx file...")
   
   
-  x.hsu.nuts2_noNA <- x.hsu.nuts2[complete.cases(x.hsu.nuts2$Spatial_unit), ]  # to remove NA's
+  x.hsu.nuts2_noNA <- x.hsu.nuts2[complete.cases(x.hsu.nuts2$s_spatunit), ]  # to remove NA's
   x.hsu.nuts2_noNA <- as.data.frame(x.hsu.nuts2_noNA)
-  
+  nm_table <- deparse(substitute(x))   # to extract the name of the table
+
   x.hsu.nuts2_longDF <- data.frame()
   for (fct in 1:length(functs)){                        #This is to stack the DataFrame in order to have a "long" format table, appropriate to be transformed to a gsx
     
+    print(functs[fct])
     wideDF <- x.hsu.nuts2_noNA[ , grepl(functs[fct], names(x.hsu.nuts2_noNA))]
     longDF <- melt(x.hsu.nuts2_noNA,
-                   id.vars=c("Spatial_unit"),
+                   id.vars=c("s_spatunit"),
                    measure.vars = names(wideDF),
-                   variable.name = "data",
+                   variable.name = "s_variable",
                    value.name = functs[fct])
-    
+
     if (fct==1){
       x.hsu.nuts2_longDF <- longDF
-      x.hsu.nuts2_longDF$data <- as.character(x.hsu.nuts2_longDF$data)
+      x.hsu.nuts2_longDF$s_variable <- as.character(x.hsu.nuts2_longDF$s_variable)
       pattern <- paste0("_", functs[fct])
-      x.hsu.nuts2_longDF$data <- gsub(pattern, "", x.hsu.nuts2_longDF$data, fixed = TRUE)
+      x.hsu.nuts2_longDF$s_variable <- gsub(pattern, "", x.hsu.nuts2_longDF$s_variable, fixed = TRUE)
       
     }else{
       x.hsu.nuts2_longDF <- cbind(x.hsu.nuts2_longDF, longDF[, -c(1, 2)])
       ncls  <- ncol(x.hsu.nuts2_longDF)
       names(x.hsu.nuts2_longDF)[ncls] <- functs[fct]
     }
+    print(head(x.hsu.nuts2_longDF))
   }
   
   x.hsu.nuts2_longDF[is.na(x.hsu.nuts2_longDF)] <- 0    #to convert all NA's to 0
   
-  #symDim <- 3
   symDim <- length(vbles) + 1 
-  nm_table <- deparse(substitute(x))   # to extract the name of the table
-  attr(x.hsu.nuts2_longDF,"symName") <- nm_table
-  #attr(dem.hsu.nuts2_longDF, "ts") <- "DEM per spatial unit"   #explanatory text for the symName
-  myText <- c("spatial entity", "statistics")     # explanatory text for the extracted index sets
+  attr(x.hsu.nuts2_longDF,"symName") <- paste0("p_", nm_table)
+  attr(x.hsu.nuts2_longDF, "ts") <- paste0(nm_table, " per spatial unit")   #explanatory text for the symName
+  myText <- c("spatial entity", "variables", "statistics")     # explanatory text for the extracted index sets
+
+  lst <- wgdx.reshape(x.hsu.nuts2_longDF, symDim, tName = "s_stats", setNames = myText)   #to reshape the DT before to write the gdx. tName is the index set name for the new index position created by reshaping 
   
-  lst <- wgdx.reshape(x.hsu.nuts2_longDF, symDim, tName = "stats", setNames = myText)   #to reshape the DT before to write the gdx. tName is the index set name for the new index position created by reshaping 
-  
-  #wgdx.lst("forest.hsu.nuts2_kk2.gdx", lst)
   wgdx.lst(paste0(nm_table, ".hsu.nuts2.gdx"), lst)
   
   
@@ -204,9 +278,41 @@ func2 <- function(x){
   print(end)
   
   return(stats.hsu.uscie)
-  
-  
+
 }  # End of Function 2
+
+
+
+
+
+## Function 3: Preparing data set to run function 2
+
+# NOTES FOR THIS FUNCTION: 
+# The first argument (x) is the data set (DataFrame)
+# spunit in the spatial unit (e.g. s_uscierc, s_hsu). By default spunit = s_uscierc
+
+
+func3 <- function(x, spunit = c("s_uscierc")){
+
+  print("Running function 3...")
+  x[[spunit]] <- as.numeric(as.character(x[[spunit]])) # to transform the column to numeric
+  x2 <- as.data.table(x) # to transform x to a DataTable
+  setkeyv(x2, spunit) # to set a key column
+
+  usciehsu_x2 <- merge(x2, hsu_uscie1, by=spunit, all.x=TRUE) #to join of old gdx file with new hsu. Type of joining "left"
+  usciehsu_x2[[spunit]] <- factor(usciehsu_x2[[spunit]]) # to transform the column to factor
+  usciehsu_x2$s_hsu2 <- factor(usciehsu_x2$s_hsu2) # to transform the column to factor
+  setkey(usciehsu_x2, "s_hsu2") # to set a key column
+  
+  x3 <- merge(usciehsu_x2, hsu2.nutsDT, by.y="hsu2", by.x="s_hsu2", all.x=TRUE)
+  setnames(x3, old="s_hsu2", new="hsu2")
+  
+  print("End of function 3")
+  return(x3)
+
+} #End of func3
+
+
 
 
 
@@ -241,7 +347,7 @@ remove(hsu_uscie2)
 
 
 ## Input 2: HSU2-NUTS-CAPRI
-# It relates HSU2 codes with NUTS2, CAPRI_NUTSII, CAPRI_NUTS0 (countries). It also include the area of each HSU
+# It relates HSU2 codes with NUTS2(Eurostat codes), CAPRI_NUTSII, CAPRI_NUTS0 (countries). It also include the area of each HSU
 
 #hsu2 <- read.csv(file="HSU2_DEFPARAM.csv")
 #nuts_capri <- read.table(file="HSU2_NUTS_TO_CAPRI_NUTS_CODES.txt",sep="\t",header = T)

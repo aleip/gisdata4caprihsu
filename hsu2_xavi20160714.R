@@ -1,42 +1,26 @@
 rm(list=objects())
-source("hsu4capri_header.r")
+source("X:/MARS_disaggregation/gisdata4caprihsu/hsu4capri_header.r") #this is only used while coding
+#source("hsu4capri_header.r")
 
 
 ###### Input 3: Data to be computed #####
 
-# It has to be done outside the function because each original data set has different number of columns. It would do the function too much complex
+# It has to be done outside the function 2 because each original data set has different number of columns. It would do the function too much complex
 
 
 #### FOREST SHARE ####
-gdxInfo("forestshare.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
+
+#gdxInfo("forestshare.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
+#This dataset contains forest share data at USCIE level
 adf <- rgdx.param("forestshare.gdx","p_forshares") #load of gdx linking forest shares and USCIE numbers, dataset coming from capri/dat/capdis/hsu2
 names(adf) <- c("s_uscierc","s_years","value")
 adfm <- dcast(adf, s_uscierc ~ s_years, drop=TRUE, value.var="value")  #to split the years in two columns containing forshare info
+setnames(adfm, old = c("2000","2006"), new = c("f_2000", "f_2006")) # to change colnames
 
-#from here to 'endfun3' into new function
-adfm$s_uscierc <- as.numeric(as.character(adfm$s_uscierc)) # to transform the column to numeric
-adfm2 <- as.data.table(adfm) # to transform adfm to a DataTable
-setkey(adfm2, "s_uscierc") # to set a key column
-#str(adfm2)
-#tables()  # to see info of the tables in memory
-#remove(adfm)
-#gc()
+## Running Function 3: Preparing data set to run function 2
 
-usciehsu_forshare2 <- merge(adfm2, hsu_uscie1, by="s_uscierc", all.x=TRUE) #to join of old gdx file with new hsu. Type of joining "left"
-usciehsu_forshare2$s_uscierc <- factor(usciehsu_forshare2$s_uscierc) # to transform the column to factor
-usciehsu_forshare2$s_hsu2 <- factor(usciehsu_forshare2$s_hsu2) # to transform the column to factor
-setkey(usciehsu_forshare2, "s_hsu2") # to set a key column
+forshare2 <- func3(adfm, "s_uscierc")
 
-#Put ealier before new function3
-setnames(usciehsu_forshare2, old = c("2000","2006"), new = c("f_2000", "f_2006")) # to change colnames
-#str(usciehsu_forshare2)
-
-forshare2 <- merge(usciehsu_forshare2, hsu2.nutsDT, by.y="hsu2", by.x="s_hsu2", all.x=TRUE)
-setnames(forshare2,old="s_hsu2",new="hsu2")
-#endfun3
-
-#head(forshare2)
-#str(forshare2)
 
 #### ####
 
@@ -45,9 +29,10 @@ setnames(forshare2,old="s_hsu2",new="hsu2")
 stats.hsu.uscie <- func2(forshare2)
 #head(stats.hsu.uscie)
 
+
 ### Running Function1: 
-#to check for minimum
-forest.hsu.nuts2 <- func1(forshare2, functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("f_2000", "f_2006"), na.rm=TRUE)
+#to check for minimum  Aixö s'ha de fer!!!!!
+forest.hsu.nuts2 <- func1(forshare2, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("f_2000", "f_2006"), na.rm=TRUE)
 
 
 #head(forest.hsu.nuts2)
@@ -69,37 +54,22 @@ save(forest.hsu.nuts2, file="forest.hsu.nuts2.rdata")
 
 
 
-gdxInfo("uscie_dem.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
+#gdxInfo("uscie_dem.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
+#This dataset contains forest share data at USCIE level
 uscie.dem <- rgdx.param("uscie_dem.gdx","p_uscierc_dem") #load gdx file linking uscie and dem, dataset coming from capri/dat/capdis/uscie
 colnames(uscie.dem)[1] <- "s_uscierc"
 colnames(uscie.dem)[3] <- "variables" 
 dem <- dcast(uscie.dem, s_uscierc ~ variables, drop=TRUE, value.var="value")  #to split the variables in the data set (altitude_m, slope_perc) in two different columns 
-dem$s_uscierc <- as.numeric(as.character(dem$s_uscierc)) # to transform the column to numeric
-dem2 <- as.data.table(dem) # to transform dem to a DataTable
-setkey(dem2, "s_uscierc") # to set a key column
-#str(dem2)
-#remove(dem)
-#gc()
-#head(dem2)
 
-usciehsu_dem <- merge(dem2, hsu_uscie1, by="s_uscierc", all.x=TRUE) #to join of old gdx file with new hsu. Type of joining "left"
-head(usciehsu_dem)
+## Running Function 3: Preparing data set to run function 2
 
-usciehsu_dem$s_uscierc <- factor(usciehsu_dem$s_uscierc) # to transform the column to factor
-usciehsu_dem$s_hsu2 <- factor(usciehsu_dem$s_hsu2) # to transform the column to factor
-setkey(usciehsu_dem, "s_hsu2") # to set a key column
-#str(usciehsu_dem)
-
-DEM3 <- merge(usciehsu_dem, hsu2.nutsDT, by.y="hsu2", by.x="s_hsu2", all.x=TRUE)
-setnames(DEM3,old="s_hsu2",new="hsu2")
-#head(DEM3)
-#str(DEM3)
+dem3 <- func3(dem, "s_uscierc")
 
 
 
 ### Running Function1: 
 
-dem.hsu.nuts2 <- func1(DEM3, functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("altitude_m", "slope_perc"), na.rm=TRUE)
+dem.hsu.nuts2 <- func1(dem3, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("altitude_m", "slope_perc"), na.rm=TRUE)
 
 #head(dem.hsu.nuts2)
 #str(dem.hsu.nuts2)
@@ -122,20 +92,32 @@ save(dem.hsu.nuts2, file="dem.hsu.nuts2.rdata")
 
 #### SOIL ####
 
-gdxInfo("soil_hwsd.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
-gdxInfo("hsu_hsmu.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
+#gdxInfo("soil_hwsd.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
+#This dataset contains soil data. I'm not sure but it might be at HSU level????
+adf.soil <- rgdx.param("soil_hwsd.gdx","p_soildom") #load gdx linking soil data and USCIE codes
+names(adf.soil) <- c("s_hsu2","variables","value")
+adfm.soil <- dcast(adf.soil, s_hsu2 ~ variables, drop=TRUE, value.var="value")  #to split the variables in columns containing soil info
+#head(adf.soil)
+#head(adfm.soil)
+
+## Running Function 3: Preparing data set to run function 2
+
+soil2 <- func3(adfm.soil, "s_hsu2")
 
 
-adf <- rgdx.param("soil_hwsd.gdx","p_soildom") #load of gdx linking forest shares and USCIE numbers, dataset coming from capri/dat/capdis/hsu2
-names(adf) <- c("s_uscierc","s_years","value")
-adfm <- dcast(adf, s_uscierc ~ s_years, drop=TRUE, value.var="value")  #to split the years in two columns containing forshare info
-adfm$s_uscierc <- as.numeric(as.character(adfm$s_uscierc)) # to transform the column to numeric
-adfm2 <- as.data.table(adfm) # to transform adfm to a DataTable
-setkey(adfm2, "s_uscierc") # to set a key column
-#str(adfm2)
-#tables()  # to see info of the tables in memory
-#remove(adfm)
-#gc()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
