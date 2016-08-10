@@ -43,23 +43,15 @@ igdx(gamspath)
 # 
 # NOTES FOR THIS FUNCTION: 
 # The first argument (x) is the data table
-# data2ag is to define the original data to be aggregated (i.e. uscie or hsu)
-#    xavi: the data which I've been working with is based on USCIE,
-#          so it makes no sense to compute weighted mean.
-#          However, I've split the function in two parts: 
-#          the first (if data2ag == "uscie") to compute statistics 
-#          aggregating USCIE data (as done so far), and the second 
-#          (if data2ag == "uscie") to aggragate data by HSU.
-#          Do we have data (forest, dem, etc.) at HSU level to check
-#          if the second part of the function is working properly? 
-#          I think that there is still a problem with weighted mean.
+# data2ag is to define if you want to aggregate data by uscie or hsu
 # Pass the functions (statistics) to be computed as arguments (e.g. functs = c("weighted.mean", "max"))
 # Pass the variables to compute (e.g. vbles = c("f_2000", "f_2006"))
 # If desired, provide na.rm = TRUE
-# If weighted mean wants to be computed, in the data table must be one column called "area". 
-# If it is not provided, an error message is issued and the function stops
+# If weighted mean wants to be computed, in the data table must be one column called "area". If it is not provided, an error message is issued and the function stops
+# filenm4gdx is to define the filename for the exported gdx
 
-func1 <- function(x, data2ag, functs, vbles, ...){
+
+func1 <- function(x, data2ag, functs, vbles, filenm4gdx, ...){
   
   start <- Sys.time()
   
@@ -67,16 +59,18 @@ func1 <- function(x, data2ag, functs, vbles, ...){
   
   if(tolower(data2ag) == "uscie"){
     
-    # A) Check if a weighted mean is passed, it wouldn't make sense for USCIE data
+    # Make sure that there is a USCIE column
+    if(!any(grepl("uscie", names(x))==TRUE)) stop("There isn't any USCIE column. Are you sure about data2ag=uscie???", call. = FALSE)
     
+    
+    # Check if a weighted mean is passed, it wouldn't make sense for USCIE data
     if(any(functs == "weighted.mean")) stop("It makes no sense to compute weighted mean for USCIE data", call. = FALSE)
-    
-    
+
     
     ## computing statistics per HSU ##
     print("Computing statistics per HSU...")
     
-    # B) 
+    #  
     by_hsu2 <- x %>% group_by(hsu2)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
     x.hsu <- by_hsu2 %>% summarise_at(vbles, functs, ...)    # summarise_at() is a new function included in the new Dev version of dplyr. It will replace the old summarise_each()
     
@@ -102,8 +96,7 @@ func1 <- function(x, data2ag, functs, vbles, ...){
     x.caprinuts <- by_CAPRI_NUTSII %>% summarise_at(vbles, functs, ...)
     
     colnames(x.caprinuts)[1] <- "s_spatunit"  #changing 1st column name
-    
-    
+
     
     ## Computing statistics per country (CAPRI NUTS 0) ##
     
@@ -116,21 +109,24 @@ func1 <- function(x, data2ag, functs, vbles, ...){
     colnames(x.country)[1] <- "s_spatunit"  #changing 1st column name
     
     
-    
     ## Combining by rows ##
     
     print("Creating a table with the results...")
     
     x.hsu.nuts2 <- rbind(x.hsu, x.nuts3, x.caprinuts, x.country)
+
+    if(length(functs)==1 && length(vbles)>1){
+      colnames(x.hsu.nuts2)[-1] <- paste(colnames(x.hsu.nuts2)[-1], functs, sep = "_")
+    }else if(length(functs)>1 && length(vbles)==1){
+      colnames(x.hsu.nuts2)[-1] <- paste(vbles, colnames(x.hsu.nuts2)[-1], sep = "_")
+    }else if(length(functs)==1 && length(vbles)==1){
+      colnames(x.hsu.nuts2)[-1] <- paste(colnames(x.hsu.nuts2)[-1], functs, sep = "_")
+    }
     
-    
-    
-  
 
   }else if(tolower(data2ag) == "hsu"){
-    
-    
-    # A) Check if a weighted mean is calculated - set the HSMU area as weighting parameter
+
+    ## Check if a weighted mean is calculated - set the HSMU area as weighting parameter
     for (i in 1:length(functs)){   # this loop is to add the argument "area", nedded to compute weighted mean
       if (functs[i] == "weighted.mean"){      # this is to tell the function how to compute weighted mean
         functs[i] <- "weighted.mean(., area)"   
@@ -160,9 +156,7 @@ func1 <- function(x, data2ag, functs, vbles, ...){
     
     colnames(x.caprinuts)[1] <- "s_spatunit"  #changing 1st column name
     
-    
-    
-    
+
     ## Computing statistics per country (CAPRI NUTS 0) ##
     
     print("Computing statistics per country (CAPRI NUTS 0...)")
@@ -172,80 +166,93 @@ func1 <- function(x, data2ag, functs, vbles, ...){
     x.country <- by_CAPRI_NUTS0 %>% summarise_at(vbles, functs, ...)
     
     colnames(x.country)[1] <- "s_spatunit"  #changing 1st column name
-    
-    
+
     
     ## Combining by rows ##
     
     print("Creating a table with the results...")
     
-    x.hsu.nuts2 <- rbind(x.hsu, x.nuts3, x.caprinuts, x.country)
+    x.hsu.nuts2 <- rbind(x.nuts3, x.caprinuts, x.country)
     
+    if(length(functs)==1 && length(vbles)>1){
+      colnames(x.hsu.nuts2)[-1] <- paste(colnames(x.hsu.nuts2)[-1], functs, sep = "_")
+    }else if(length(functs)>1 && length(vbles)==1){
+      colnames(x.hsu.nuts2)[-1] <- paste(vbles, colnames(x.hsu.nuts2)[-1], sep = "_")
+    }else if(length(functs)==1 && length(vbles)==1){
+      colnames(x.hsu.nuts2)[-1] <- paste(colnames(x.hsu.nuts2)[-1], functs, sep = "_")
+    }
     
-    
+    names(x.hsu.nuts2) <- gsub("weighted.mean\\(., area\\)", "weighted.mean", names(x.hsu.nuts2))
+      
 
-    
   }else{
     stop("Please, provide a correct value for the argument data2ag (i.e. uscie or hsu)", call. = FALSE)
   }
   
-
+  
   
   ## Exporting to a gdx file with ##
   
   print("Exporting to a gdx file...")
   
-  
   x.hsu.nuts2_noNA <- x.hsu.nuts2[complete.cases(x.hsu.nuts2$s_spatunit), ]  # to remove NA's
   x.hsu.nuts2_noNA <- as.data.frame(x.hsu.nuts2_noNA)
   nm_table <- deparse(substitute(x))   # to extract the name of the table
-
   x.hsu.nuts2_longDF <- data.frame()
-  for (fct in 1:length(functs)){                        #This is to stack the DataFrame in order to have a "long" format table, appropriate to be transformed to a gsx
+
+  for (fct in 1:length(functs)){            #This is to stack the DataFrame in order to have a "long" format table, appropriate to be transformed to a gsx
     
-    print(functs[fct])
-    wideDF <- x.hsu.nuts2_noNA[ , grepl(functs[fct], names(x.hsu.nuts2_noNA))]
+    if(functs[fct]=="weighted.mean(., area)"){
+      newfctnm <- "weighted.mean"
+    }else{
+      newfctnm <- functs[fct]
+    }
+    
+    wideDFnms <- grep(newfctnm, names(x.hsu.nuts2_noNA), value = TRUE)
     longDF <- melt(x.hsu.nuts2_noNA,
                    id.vars=c("s_spatunit"),
-                   measure.vars = names(wideDF),
+                   measure.vars = wideDFnms,
                    variable.name = "s_variable",
-                   value.name = functs[fct])
+                   value.name = newfctnm)
 
     if (fct==1){
       x.hsu.nuts2_longDF <- longDF
       x.hsu.nuts2_longDF$s_variable <- as.character(x.hsu.nuts2_longDF$s_variable)
-      pattern <- paste0("_", functs[fct])
+      pattern <- paste0("_", newfctnm)
       x.hsu.nuts2_longDF$s_variable <- gsub(pattern, "", x.hsu.nuts2_longDF$s_variable, fixed = TRUE)
+    
       
     }else{
       x.hsu.nuts2_longDF <- cbind(x.hsu.nuts2_longDF, longDF[, -c(1, 2)])
       ncls  <- ncol(x.hsu.nuts2_longDF)
-      names(x.hsu.nuts2_longDF)[ncls] <- functs[fct]
+      names(x.hsu.nuts2_longDF)[ncls] <- newfctnm
     }
-    print(head(x.hsu.nuts2_longDF))
   }
   
   x.hsu.nuts2_longDF[is.na(x.hsu.nuts2_longDF)] <- 0    #to convert all NA's to 0
   
-  symDim <- length(vbles) + 1 
+
+  symDim <- 3 
   attr(x.hsu.nuts2_longDF,"symName") <- paste0("p_", nm_table)
-  attr(x.hsu.nuts2_longDF, "ts") <- paste0(nm_table, " per spatial unit")   #explanatory text for the symName
+  attr(x.hsu.nuts2_longDF, "ts") <- paste0(nm_table, " statistics per spatial unit")   #explanatory text for the symName
   myText <- c("spatial entity", "variables", "statistics")     # explanatory text for the extracted index sets
 
-  lst <- wgdx.reshape(x.hsu.nuts2_longDF, symDim, tName = "s_stats", setNames = myText)   #to reshape the DT before to write the gdx. tName is the index set name for the new index position created by reshaping 
+  lst <- wgdx.reshape(x.hsu.nuts2_longDF, symDim, tName = "s_stats", setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping 
   
-  wgdx.lst(paste0(nm_table, ".hsu.nuts2.gdx"), lst)
+  wgdx.lst(paste0(filenm4gdx, ".gdx"), lst)
   
+  print(paste0("Exported gdx as ", paste0(filenm4gdx, ".gdx")))
   
   print("End of Function 1")
   
   end <- Sys.time() - start
   print(end)
+  gc()
   
   return(x.hsu.nuts2)
   
   
-}   
+}    #End of Funct1  
 
 
 
@@ -285,27 +292,52 @@ func2 <- function(x){
 
 
 
-## Function 3: Preparing data set to run function 2
+## Function 3: Preparing data set to run function 1
 
 # NOTES FOR THIS FUNCTION: 
+# It relates the data set with HSU2 (if it is based on USCIE) and NUTS. Also adds HSU areas
 # The first argument (x) is the data set (DataFrame)
-# spunit in the spatial unit (e.g. s_uscierc, s_hsu). By default spunit = s_uscierc
 
 
-func3 <- function(x, spunit = c("s_uscierc")){
+func3 <- function(x){
 
   print("Running function 3...")
-  x[[spunit]] <- as.numeric(as.character(x[[spunit]])) # to transform the column to numeric
-  x2 <- as.data.table(x) # to transform x to a DataTable
-  setkeyv(x2, spunit) # to set a key column
-
-  usciehsu_x2 <- merge(x2, hsu_uscie1, by=spunit, all.x=TRUE) #to join of old gdx file with new hsu. Type of joining "left"
-  usciehsu_x2[[spunit]] <- factor(usciehsu_x2[[spunit]]) # to transform the column to factor
-  usciehsu_x2$s_hsu2 <- factor(usciehsu_x2$s_hsu2) # to transform the column to factor
-  setkey(usciehsu_x2, "s_hsu2") # to set a key column
   
-  x3 <- merge(usciehsu_x2, hsu2.nutsDT, by.y="hsu2", by.x="s_hsu2", all.x=TRUE)
-  setnames(x3, old="s_hsu2", new="hsu2")
+  nmt <- deparse(substitute(x))
+  
+
+  if(any(grepl("s_uscierc", names(x))==TRUE)){  #to add HSU2, their areas, and NUTS data
+    
+    print(paste0("Relating ", nmt, " with HSU2 and NUTS codes"))  
+    
+    x$s_uscierc <- as.numeric(as.character(x$s_uscierc)) # to transform the column to numeric
+    x2 <- as.data.table(x) # to transform x to a DataTable
+    setkeyv(x2, "s_uscierc") # to set a key column
+   
+    usciehsu_x2 <- merge(x2, hsu_uscie1, by="s_uscierc", all.x=TRUE) #to join of old gdx file with new hsu. Type of joining "left"
+    gc()
+    usciehsu_x2$s_uscierc <- factor(usciehsu_x2$s_uscierc) # to transform the column to factor
+    usciehsu_x2$s_hsu2 <- factor(usciehsu_x2$s_hsu2) # to transform the column to factor
+    setkey(usciehsu_x2, "s_hsu2") # to set a key column
+    
+    x3 <- merge(usciehsu_x2, hsu2.nutsDT, by.y="hsu2", by.x="s_hsu2", all.x=TRUE)
+    setnames(x3, old="s_hsu2", new="hsu2")
+    
+    
+  }else{  #to add hsu2 areas and NUTS data
+    
+    print(paste0("Relating ", nmt, " with NUTS codes"))  
+    x$s_hsu2 <- gsub("U", "", x$s_hsu2)
+    #x$s_hsu2 <- as.numeric(as.character(x$s_hsu2)) # to transform the column to numeric
+    x2 <- as.data.table(x) # to transform x to a DataTable
+    setkeyv(x2, "s_hsu2") # to set a key column
+    gc()
+    
+    x3 <- merge(x2, hsu2.nutsDT, by.x="s_hsu2", by.y="hsu2", all.x=TRUE)
+    setnames(x3, old="s_hsu2", new="hsu2")
+    
+
+  }
   
   print("End of function 3")
   return(x3)
@@ -317,31 +349,37 @@ func3 <- function(x, spunit = c("s_uscierc")){
 
 
 
-## Input 1: USCIE-HSU2 table
+## Input 1: USCIE-HSU2 table and 
 # It relates USCIE codes with HSU2 codes
 #coming from USCIE_HSU2.CSV. Reading the file directly from the CSV with fread(). 
 hsu_uscie1 <- fread("USCIE_HSU2.csv", header=TRUE) # fread() function is much faster than load()
 # You get a DataTable
 names(hsu_uscie1) <- c("s_uscierc","s_hsu2")
 setkey(hsu_uscie1, "s_uscierc") # to set a key column of the DataTable
-#export as gdx       xavi: How can I export as gdx without data? THer are only two columns (uscie and hsu codes) 
 #str(hsu_uscie1)
 #head(hsu_uscie1)
 
-#Export to a gdx file
+#Export to a gdx file   #xavi: I'm not sure that it is correctly done
 
 hsu_uscie2 <- as.data.frame(hsu_uscie1)
 #hsu_uscie1[is.na(hsu_uscie1)] <- 0    #to convert all NA's to 0
 symDim <- 2
 attr(hsu_uscie2,"symName") <- "hsu_uscie"
-attr(hsu_uscie2, "ts") <- "relates HSU2 codes USCIE codes"   #explanatory text for the symName
-#myText <- c("hsu2 code", "uscie code")     # explanatory text for the extracted index sets
-#lst <- wgdx.reshape(hsu2.nuts, symDim, tName = "area", order=c(2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
-lst <- wgdx.reshape(hsu_uscie2, symDim, order=c(2,1,0))   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+attr(hsu_uscie2, "ts") <- "relates HSU2 codes and USCIE codes"   #explanatory text for the symName
+myText <- c("hsu2 code", "uscie code")     # explanatory text for the extracted index sets
+lst <- wgdx.reshape(hsu_uscie2, tName = "s_uscie", symDim, order=c(2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
 wgdx.lst("hsu2_uscie1", lst)
 
 remove(hsu_uscie2)
 
+
+#It relates HSU2 with old HSMU codes
+#hsuhsmu <- rgdx.param("hsu_hsmu.gdx","p_hsu_hsmu")#load of gdx linking old and new hsu,dataset coming from capri/dat/capdis/hsu2
+#hsuhsmu <- hsuhsmu[,1:2]
+#names(hsuhsmu) <- c("hsu2","hsmu")
+#hsuhsmu$hsu2 <- gsub("U","",hsuhsmu$hsu2)
+#hsuhsmu$hsmu <- gsub("H|U|HE","",hsuhsmu$hsmu)
+#head(hsuhsmu)
 
 
 

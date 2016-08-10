@@ -19,7 +19,7 @@ setnames(adfm, old = c("2000","2006"), new = c("f_2000", "f_2006")) # to change 
 
 ## Running Function 3: Preparing data set to run function 2
 
-forshare2 <- func3(adfm, "s_uscierc")
+forshare2 <- func3(adfm)
 
 
 #### ####
@@ -30,9 +30,13 @@ stats.hsu.uscie <- func2(forshare2)
 #head(stats.hsu.uscie)
 
 
-### Running Function1: 
-#to check for minimum  Aixö s'ha de fer!!!!!
-forest.hsu.nuts2 <- func1(forshare2, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("f_2000", "f_2006"), na.rm=TRUE)
+### Running Function1:
+# Statistics can be computed aggregating data either by USCIE or by HSU2
+# By USCIE
+forest.hsu.nuts2 <- func1(forshare2, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("f_2000", "f_2006"), filenm4gdx = "forest.uscie.stats", na.rm=TRUE)
+
+# By HSU
+forest.hsu.nuts2 <- func1(forshare2, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("f_2000", "f_2006"), filenm4gdx = "forest.hsu.stats", na.rm=TRUE)
 
 
 #head(forest.hsu.nuts2)
@@ -60,24 +64,25 @@ uscie.dem <- rgdx.param("uscie_dem.gdx","p_uscierc_dem") #load gdx file linking 
 colnames(uscie.dem)[1] <- "s_uscierc"
 colnames(uscie.dem)[3] <- "variables" 
 dem <- dcast(uscie.dem, s_uscierc ~ variables, drop=TRUE, value.var="value")  #to split the variables in the data set (altitude_m, slope_perc) in two different columns 
+#head(dem)
 
 ## Running Function 3: Preparing data set to run function 2
 
-dem3 <- func3(dem, "s_uscierc")
+dem3 <- func3(dem)
+#head(dem3)
 
 
 
 ### Running Function1: 
 
-dem.hsu.nuts2 <- func1(dem3, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("altitude_m", "slope_perc"), na.rm=TRUE)
+# Statistics can be computed aggregating data either by USCIE or by HSU2
+# By USCIE
+dem.uscie.nuts2 <- func1(dem3, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("altitude_m", "slope_perc"), filenm4gdx = "dem.uscie.stats", na.rm=TRUE)
 
-#head(dem.hsu.nuts2)
-#str(dem.hsu.nuts2)
-#sum(is.na(dem.hsu.nuts2$Spatial_unit))  # there are 2 NA
-#dem.hsu.nuts3 <- dem.hsu.nuts2[!is.na(dem.hsu.nuts2$Spatial_unit),]  # to remove NA
-#dem.hsu.nuts3 <- droplevels(dem.hsu.nuts3) # to definetly remove them
+# By HSU2
+dem.hsu.nuts2 <- func1(dem3, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("altitude_m", "slope_perc"), filenm4gdx = "dem.hsu.stats", na.rm=TRUE)
 
-#remove(prova_dem.hsu.nuts2)
+
 
 save(dem.hsu.nuts2, file="dem.hsu.nuts2.rdata")
 #load(file = "dem.hsu.nuts2.rdata")
@@ -87,90 +92,53 @@ save(dem.hsu.nuts2, file="dem.hsu.nuts2.rdata")
 
 
 
-
-
-
 #### SOIL ####
 
 #gdxInfo("soil_hwsd.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
-#This dataset contains soil data. I'm not sure but it might be at HSU level????
-adf.soil <- rgdx.param("soil_hwsd.gdx","p_soildom") #load gdx linking soil data and USCIE codes
+#This dataset contains soil data at HSU2 level.
+adf.soil <- rgdx.param("soil_hwsd.gdx", "p_soildom")  #load of gdx linking soil properties and hsu, dataset coming from capri/dat/capdis/hsu2
 names(adf.soil) <- c("s_hsu2","variables","value")
-adfm.soil <- dcast(adf.soil, s_hsu2 ~ variables, drop=TRUE, value.var="value")  #to split the variables in columns containing soil info
+hsu2.soil <- dcast(adf.soil, s_hsu2 ~ variables, drop=TRUE, value.var="value")  #to split the variables in columns containing soil info
 #head(adf.soil)
-#head(adfm.soil)
+#head(hsu2.soil)
+
+
 
 ## Running Function 3: Preparing data set to run function 2
+# memory.limit(size = 4000000)
+#gc()
 
-soil2 <- func3(adfm.soil, "s_hsu2")
+soil2 <- func3(hsu2.soil)
+#head(soil2)
 
+### Running Function1: 
+# xavi: I couldn't find soil data at uscie level, so it only can be computed aggregating data at HSU level
 
-
-
-
-
-
-
-
-
-
+vrbles <- names(hsu2.soil)[-1]
+soil.hsu.nuts2 <- func1(soil2, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = vrbles, filenm4gdx = "soil.hsu.stats", na.rm=TRUE)
 
 
+#head(soil.hsu.nuts2)
+
+
+save(soil.hsu.nuts2, file="dem.hsu.nuts2.rdata")
+#load(file = "dem.hsu.nuts2.rdata")
+#head(dem.hsu.nuts2)
 
 
 
 
 
-gdx.s <- rgdx.param("soil_hwsd.gdx","p_soildom") #load of gdx linking soil properties and old hsu, dataset coming from capri/dat/capdis/hsu2
-gdx.sm <- dcast(gdx.s,i~j,drop=T,value.var="value")
-hsu2.soil <- gdx.sm
-save(hsu2.soil,file="hsu_soil.rdata")
-load(file="hsu_soil.rdata")
 
-hsuhsmu <- rgdx.param("hsu_hsmu.gdx","p_hsu_hsmu")#load of gdx linking old and new hsu,dataset coming from capri/dat/capdis/hsu2
-names(hsuhsmu) <- c("hsu2","hsmu")
-hsuhsmu$hsu2 <- gsub("U","",hsuhsmu$hsu2)
-hsuhsmu$hsmu <- gsub("H|U|HE","",hsuhsmu$hsmu)
-hsuhsmu1 <- hsuhsmu[,1:2]
-colnames(hsu2.soil)[1] <- "hsmu"
-hsu2.soil$hsmu <- gsub("U","",hsu2.soil$hsmu)
+#### MARS_YIELD ####
 
-hsu2soil <- join(hsuhsmu1,hsu2.soil) #join to link new hsu and soil properties
-hsu2soil1 <- hsu2soil[,c(1,3:17)]
-hsu.nuts.soil <- join(hsu2soil1,hsu2.nuts) #join to link soil database with nuts
-
-#calculation of weighted mean (by area) soil properties value per hsu
-hsu2.soilprop <-ddply(hsu.nuts.soil[,1:17],c("hsu2"),function(df){
-  numcolwise(weighted.mean)(df, na.rm = T, w=df$area)
-  numcolwise(round,2)(df)})
-colnames(hsu2.soilprop)[1] <- "Spatial_unit"
-hsu2.soilprop$Spatial_unit <- paste0("U",hsu2.soilprop$Spatial_unit,sep="")
-#calculation of mean soil properties value per nuts3
-soil.nuts3 <-ddply(hsu.nuts.soil[,2:18],c("nuts3"),function(df){
-  numcolwise(mean)(df, na.rm = T)
-  numcolwise(round,2)(df)})
-colnames(soil.nuts3)[1] <- "Spatial_unit"
-#calculation of mean soil properties value per nuts2
-soil.nuts2 <-ddply(hsu.nuts.soil[,c(2:17,20)],c("nuts2"),function(df){
-  numcolwise(mean)(df, na.rm = T)
-  numcolwise(round,2)(df)})
-colnames(soil.nuts2)[1] <- "Spatial_unit"
-#calculation of mean soil properties value per capri nuts
-soil.caprinuts <-ddply(hsu.nuts.soil[,c(2:17,21)],c("CAPRI_NUTSII"),function(df){
-  numcolwise(mean)(df, na.rm = T)
-  numcolwise(round,2)(df)})
-colnames(soil.caprinuts)[1] <- "Spatial_unit"
-soil.hsu.nuts <- rbind(hsu2.soilprop,soil.nuts3,soil.nuts2,soil.caprinuts)
-soil.hsu.nuts <- soil.hsu.nuts[,1:16]
-save(soil.hsu.nuts,file = "soil.hsu.nuts.rdata")
-#load(file = "soil.hsu.nuts.rdata")
-
-#Create gdx file with new hsu and soil properties
-symDim <- 2
-ciao <- soil.hsu.nuts[!is.na(soil.hsu.nuts$Spatial_unit),]
-attr(ciao,"symName") <- "p_soil"
-lst <- wgdx.reshape(ciao,symDim,tName = "p_soil_properties")
-wgdx.lst("soil.hsu.nuts.gdx",lst)
+#gdxInfo("mars_yield.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
+#This dataset contains soil data at HSU2 level.
+m_yield <- rgdx.param("mars_yield.gdx", "p_marsyield")  #load of gdx linking soil properties and hsu, dataset coming from capri/dat/capdis/hsu2
+names(m_yield) <- c("HSMUID","crop","yield","year","value")
+hsu2.soil <- dcast(adf.soil, s_hsu2 ~ variables, drop=TRUE, value.var="value")  #to split the variables in columns containing soil info
+#head(m_yield)
+#head(hsu2.soil)
 
 
 
@@ -178,52 +146,6 @@ wgdx.lst("soil.hsu.nuts.gdx",lst)
 
 
 
-
-
-
-
-
-
-
-#
-save.image("X:/MARS_disaggregation/hsu2_database_togdx_201605_nocita/hsu2_xavi.RData")
-#
-
-
-
-
-
-
-
-
-
-
-
-
-
-#centroids
-hsu2.coo <- read.csv(file="HSU2_CENTER_COORDINATES.csv") #load of csv file linking coordinated and HSU numbers, dataset coming from capri/dat/capdis/hsu2
-colnames(hsu2.coo)[1] <- "hsu2"
-hsu2.coo.nuts <- join(hsu2.coo,hsu2.nuts) #link between hsu coordinated and nuts
-save(hsu2.coo.nuts,file = "hsu2.coo.nuts.rdata")
-load(file = "hsu2.coo.nuts.rdata")
-hsu2.coo.nuts$hsu2 <- paste0("U",hsu2.coo.nuts$hsu2,sep="")
-hsu2.coo1 <- hsu2.coo.nuts[,1:3]
-colnames(hsu2.coo1)[1] <- "Spatial_unit"
-hsu2.nuts3 <- hsu2.coo.nuts[,c(4,2,3)]
-colnames(hsu2.nuts3)[1] <- "Spatial_unit"
-hsu2.nuts2 <- hsu2.coo.nuts[,c(5,2,3)]
-colnames(hsu2.nuts2)[1] <- "Spatial_unit"
-hsu2.CAPRI_NUTSII <- hsu2.coo.nuts[,c(6,2,3)] 
-colnames(hsu2.CAPRI_NUTSII)[1] <- "Spatial_unit"
-centres.hsu.nuts <- rbind(hsu2.coo1,hsu2.nuts3,hsu2.nuts2,hsu2.CAPRI_NUTSII)
-save(centres.hsu.nuts,file = "coo.hsu.nuts.rdata")
-#creation of gdx file with updated hsu
-ciao <- centres.hsu.nuts[!is.na(centres.hsu.nuts$Spatial_unit),]
-symDim <- 2
-attr(ciao,"symName") <- "p_centres"
-lst <- wgdx.reshape(ciao,symDim,tName = "coordinates")
-wgdx.lst("coo.hsu.nuts.gdx",lst)
 
 #mars_yield
 mars.yield <- rgdx.param("mars_yield.gdx","p_marsyield") #load gdx file linking mars yields with old hsu (hsmu), dataset coming from capri/dat/capdis/hsu2 
@@ -270,6 +192,9 @@ attr(ciao,"symName") <- "p_marsyield"
 lst <- wgdx.reshape(ciao,symDim,tName = "p_marsyield_data")
 wgdx.lst("marsyield.hsu.nuts.gdx",lst)
 
+
+
+
 #irrishare
 uscie.irr <- rgdx.param("uscie_irrishare.gdx","irr_share2000") #load gdx file linking uscie and irrigation shares, dataset coming from capri/dat/capdis/uscie
 colnames(uscie.irr)[1] <- "USCIE_RC"
@@ -304,6 +229,33 @@ ciao <- irrshare.hsu.nuts[!is.na(irrshare.hsu.nuts$Spatial_unit),]
 attr(ciao,"symName") <- "p_irrshare"
 lst <- wgdx.reshape(ciao,symDim,tName = "p_irrshare_stats")
 wgdx.lst("irrshare.hsu.nuts.gdx",lst)
+
+
+#centroids
+hsu2.coo <- read.csv(file="HSU2_CENTER_COORDINATES.csv") #load of csv file linking coordinated and HSU numbers, dataset coming from capri/dat/capdis/hsu2
+colnames(hsu2.coo)[1] <- "hsu2"
+hsu2.coo.nuts <- join(hsu2.coo,hsu2.nuts) #link between hsu coordinated and nuts
+save(hsu2.coo.nuts,file = "hsu2.coo.nuts.rdata")
+load(file = "hsu2.coo.nuts.rdata")
+hsu2.coo.nuts$hsu2 <- paste0("U",hsu2.coo.nuts$hsu2,sep="")
+hsu2.coo1 <- hsu2.coo.nuts[,1:3]
+colnames(hsu2.coo1)[1] <- "Spatial_unit"
+hsu2.nuts3 <- hsu2.coo.nuts[,c(4,2,3)]
+colnames(hsu2.nuts3)[1] <- "Spatial_unit"
+hsu2.nuts2 <- hsu2.coo.nuts[,c(5,2,3)]
+colnames(hsu2.nuts2)[1] <- "Spatial_unit"
+hsu2.CAPRI_NUTSII <- hsu2.coo.nuts[,c(6,2,3)] 
+colnames(hsu2.CAPRI_NUTSII)[1] <- "Spatial_unit"
+centres.hsu.nuts <- rbind(hsu2.coo1,hsu2.nuts3,hsu2.nuts2,hsu2.CAPRI_NUTSII)
+save(centres.hsu.nuts,file = "coo.hsu.nuts.rdata")
+#creation of gdx file with updated hsu
+ciao <- centres.hsu.nuts[!is.na(centres.hsu.nuts$Spatial_unit),]
+symDim <- 2
+attr(ciao,"symName") <- "p_centres"
+lst <- wgdx.reshape(ciao,symDim,tName = "coordinates")
+wgdx.lst("coo.hsu.nuts.gdx",lst)
+
+
 
 #meteo
 uscie.par <- read.csv(file="USCIE_PARAM.csv") #load csv file linking uscie and grid numbers, dataset coming from capri/dat/capdis/uscie
