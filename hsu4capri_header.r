@@ -417,7 +417,8 @@ if(file.exists(dataprep)){
     setkey(uscie_marsgrid,"s_uscierc")
     hsu_uscie_marsgrid <- hsu_uscie1[uscie_marsgrid][!is.na(s_hsu2)&marsgrid!=0]
     hsu_uscie_marsgrid<-hsu_uscie_marsgrid[,.(area=.N),by=.(s_hsu2,marsgrid)]
-    hsu_uscie_marsgrid<-hsu_uscie_marsgrid[,`:=`(gridarea=sum(area)),by=marsgrid]
+    hsu_uscie_marsgrid<-hsu_uscie_marsgrid[,`:=`(gridarea=sum(area)),by=s_hsu2]
+    # Fraction of HSU2 that belongs to a certain MARSGRID
     hsu_uscie_marsgrid<-hsu_uscie_marsgrid[,`:=`(fraction=area/gridarea)]
     
     ### Save data in rdata format ####
