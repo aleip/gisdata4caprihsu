@@ -20,7 +20,7 @@ if(Sys.info()[4]=="L01RI1203587"){ #checks machine name
     workpath<-"x:/adrian/tools/rprojects/gisdata4caprihsu/"
     
 }else{
-    workpath<-"X:/MARS_disaggregation/hsu2_statistics_xavi"
+    workpath<-"X:/MARS_disaggregation/hsu2_statistics_xavi/"
     usciedatapath<-workpath
     gamspath<-"X:/GAMS/win64/24.7"
 }
@@ -316,7 +316,7 @@ func3 <- function(x){
         usciehsu_x2$s_hsu2 <- factor(usciehsu_x2$s_hsu2) # to transform the column to factor
         setkey(usciehsu_x2, "s_hsu2") # to set a key column
         
-        x3 <- merge(usciehsu_x2, hsu2_nutsDT, by.y="hsu2", by.x="s_hsu2", all.x=TRUE)
+        x3 <- merge(usciehsu_x2, hsu2_nuts, by.y="s_hsu2", by.x="s_hsu2", all.x=TRUE)
         setnames(x3, old="s_hsu2", new="hsu2")
         
         
@@ -329,7 +329,7 @@ func3 <- function(x){
         setkeyv(x2, "s_hsu2") # to set a key column
         gc()
         
-        x3 <- merge(x2, hsu2_nutsDT, by.x="s_hsu2", by.y="hsu2", all.x=TRUE)
+        x3 <- merge(x2, hsu2_nuts, by.x="s_hsu2", by.y="s_hsu2", all.x=TRUE)
         setnames(x3, old="s_hsu2", new="hsu2")
         
         
@@ -352,8 +352,10 @@ func3 <- function(x){
 
 
 dataprep<-paste0(usciedatapath,"Uscie_hsu2_nuts.rdata")
+
 if(file.exists(dataprep)){
     load(file = dataprep)
+  
 }else{
     ### Input 1: USCIE-HSU2 table  ####
     # It relates USCIE codes with HSU2 codes
@@ -395,23 +397,27 @@ if(file.exists(dataprep)){
     
     
     ### Input 3: CAPRI NUTS ####
-    #al20160823 - original file is *csv
-    #nuts_capri <- fread(paste0(usciedatapath,"HSU2_NUTS_TO_CAPRI_NUTS_CODES.txt"), header=TRUE) 
-    #setkey(nuts_capri, "nuts3") # to set a key column of the DataTable
     nuts_capri <- fread(paste0(usciedatapath,"HSU2_NUTS_TO_CAPRI_NUTS_CODES.csv"), header=TRUE,drop="CAPRI_MS") 
     setnames(nuts_capri,old = c("ADMIN_EEZ","NURGCDL2"),new = c("nuts3","nuts2")) #keep CAPRI_NUTSII,CAPRI_NUTS0
     setkey(nuts_capri, "nuts3") # to set a key column of the DataTable
     hsu2_nuts <- merge(hsu2_nuts3, nuts_capri, by.x = "nuts3", by.y = "nuts3", all.x = TRUE)
     rm(hsu2_nuts3,nuts_capri) #Not needed any more
-    
     hsu2_nuts$s_hsu2 <- factor(hsu2_nuts$s_hsu2) # to transform the column to factor
     setkey(hsu2_nuts, "s_hsu2") # to set a key column
+    #Export to a gdx file
+    hsu2_nuts <- hsu2_nuts[complete.cases(hsu2_nuts), ]  # to remove NA's
+    symDim <- 7
+    attr(hsu2_nuts,"symName") <- "hsu_nuts_capri"
+    attr(hsu2_nuts, "ts") <- "relates HSU2 codes (and areas) with NUTS2, CAPRI_NUTSII, CAPRI_NUTS0"   #explanatory text for the symName
+    myText <- c("country code","nuts2 code of capri","nuts2 code","soil mapping unit","hsu2 code", "nuts3 code","area of hsu2")     # explanatory text for the extracted index sets
+    lst <- wgdx.reshape(hsu2_nuts, symDim,tName = "area", setsToo=TRUE,order=c(7,6,5,4,2,1,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+    wgdx.lst("hsu2_nuts1", lst)
     
+
     ### Input 4: Fraction of MARS-GRID per HSU2 ####
     #load csv file linking uscie and grid numbers, dataset coming from capri/dat/capdis/uscie
     uscie_marsgrid <- fread(paste0(usciedatapath,"../hsu2_database_togdx_201605_nocita/","USCIE_PARAM.csv"), header=TRUE,select=c(1, 3)) 
     setnames(uscie_marsgrid,old=c("USCIE_RC","GRIDNO"),new=c("s_uscierc","marsgrid"))
-    
     # Merge uscie - marsgrid - with HSU2; eliminate empty HSU2 and MARS-grids
     setkey(hsu_uscie1,"s_uscierc")
     setkey(uscie_marsgrid,"s_uscierc")
@@ -424,76 +430,8 @@ if(file.exists(dataprep)){
     ### Save data in rdata format ####
     save(hsu2_nuts,hsu_uscie1,hsu_uscie_marsgrid,file=dataprep)
 }
-#al20160823 it is already a data table
-#hsu2_nutsDT <- as.data.table(hsu2_nuts) # to transform hsu2_nuts to a DataTable
 
 
-#Export to a gdx file
-
-hsu2_nuts <- hsu2_nuts[complete.cases(hsu2_nuts), ]  # to remove NA's
-symDim <- 7
-attr(hsu2_nuts,"symName") <- "hsu_nuts_capri"
-attr(hsu2_nuts, "ts") <- "relates HSU2 codes (and areas) with NUTS2, CAPRI_NUTSII, CAPRI_NUTS0"   #explanatory text for the symName
-myText <- c("country code","nuts2 code of capri","nuts2 code","soil mapping unit","nuts3 code","hsu2 code","area of hsu2")     # explanatory text for the extracted index sets
-lst <- wgdx.reshape(hsu2_nuts, symDim,tName = "area", setsToo=FALSE,order=c(7,6,5,4,3,1,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
-wgdx.lst("hsu2_nuts1", lst)
-
-remove(hsu2_nuts)
-remove(hsu2_nuts3)
-
-
-## Input 4: HSU-METEOGRID
-
-# activate <- 0  # if activate=0, this part of code is ommited
-# # if activate=1, this part of code runs, but it takes more than two days to calculate the results
-# 
-# if (activate==1){
-#     
-#     
-#     hsu_grid <- hsu_uscie_marsgrid[,c(2, 3), with=FALSE] #removing USCIE col
-#     str(hsu_grid)
-#     
-#     uniq_hsu_grid <- unique(hsu_grid)
-#     head(uniq_hsu_grid)
-#     
-#     hsu_frac <- data.frame(s_hsu2=character(), GRIDNO=character(), frac=numeric(), stringsAsFactors=FALSE)
-#     
-#     for (i in 1:nrow(uniq_hsu_grid)){   # To compute What fraction of each HSU is occuped by each GRID
-#         #for (i in 10000:10010){
-#         #for (i in 9700:10100){
-#         
-#         #print(uniq_hsu_grid[i])
-#         hsu <- uniq_hsu_grid[i]$s_hsu2
-#         grid <- uniq_hsu_grid[i]$GRIDNO
-#         
-#         #sel <- subset(hsu_grid, s_hsu2==hsu & GRIDNO==grid)
-#         sel <- hsu_grid[(s_hsu2==hsu & GRIDNO==grid)]
-#         nrw <- nrow(sel)
-#         
-#         #sel2 <- subset(hsu_grid, s_hsu2==hsu)
-#         sel2 <- hsu_grid[s_hsu2==hsu]
-#         nrw2 <- nrow(sel2)
-#         
-#         frac <- nrw/nrw2
-#         
-#         hsu_frac[i,1] <- hsu
-#         hsu_frac[i,2] <- grid
-#         hsu_frac[i,3] <- frac
-#         
-#     }    
-#     
-#     
-#     
-#     View(hsu_frac)
-#     uniq_hsu_grid[uniq_hsu_grid$s_hsu2==501792,]
-#     hsu_grid[s_hsu2==419435]
-#     hsu_frac[hsu_frac$s_hsu2==419435,]
-#     subset(hsu_frac, s_hsu2==419238)
-#     
-#     
-#     
-#     
-# } #End if activate==1
 
 
 

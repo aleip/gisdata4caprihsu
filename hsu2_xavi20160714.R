@@ -193,7 +193,7 @@ names(adf) <- c("s_uscierc","s_years","value")
 adfm <- dcast(adf, s_uscierc ~ s_years, drop=TRUE, value.var="value")  #to split the years in two columns containing forshare info
 setnames(adfm, old = c("2000","2006"), new = c("f_2000", "f_2006")) # to change colnames
 
-## Running Function 3: Preparing data set to run function 2
+## Running Function 3: Preparing data set to run function 1
 
 forshare <- func3(adfm)
 
@@ -231,7 +231,7 @@ colnames(uscie_dem)[1] <- "s_uscierc"
 colnames(uscie_dem)[3] <- "variables" 
 uscie_dem2 <- dcast(uscie_dem, s_uscierc ~ variables, drop=TRUE, value.var="value")  #to split the variables in the data set (altitude_m, slope_perc) in two different columns 
 
-## Running Function 3: Preparing data set to run function 2
+## Running Function 3: Preparing data set to run function 1
 
 dem <- func3(uscie_dem2)
 
@@ -263,7 +263,7 @@ adf_soil <- rgdx.param("soil_hwsd.gdx", "p_soildom")  #load of gdx linking soil 
 names(adf_soil) <- c("s_hsu2", "variables", "value")
 hsu2_soil <- dcast(adf_soil, s_hsu2 ~ variables, drop=TRUE, value.var="value")  #to split the variables in columns containing soil info
 
-## Running Function 3: Preparing data set to run function 2
+## Running Function 3: Preparing data set to run function 1
 
 soil <- func3(hsu2_soil)
 
@@ -311,7 +311,7 @@ head(mars_yield_smu)
 
 
 
-## Running Function 3: Preparing data set to run function 2
+## Running Function 3: Preparing data set to run function 1
 
 yield_smth_hsu <- func3(mars_yield_smth4)
 
@@ -340,7 +340,7 @@ uscie_irr <- rgdx.param("uscie_irrishare.gdx", "irr_share2000")  #load of gdx li
 names(uscie_irr) <- c("s_uscierc", "irr")
 #No need to dcast because there is only one variable
 
-## Running Function 3: Preparing data set to run function 2
+## Running Function 3: Preparing data set to run function 1
 
 irrishare <- func3(uscie_irr)
 
@@ -380,7 +380,7 @@ head(uscie_meteo_mth2)
 
 
 
-## Running Function 3: Preparing data set to run function 2
+## Running Function 3: Preparing data set to run function 
 
 meteo_month <- func3(uscie_meteo_mth2)
 head(meteo_month)
@@ -577,100 +577,132 @@ wgdx.lst("marsmeteo.trimester.hsu.nuts.gdx",lst)
 
 
 
+#### WET DEPOSITION FOR OXN, RDN, and SOX ####
 
-#gisconuts
-gis_nuts <- read.csv(file="LINK_HSU2_CAPRI_GISCO2010_NUTS_CODES_uniqueGISCO2010.csv") #load of new hsu and gisconuts
-gis.nuts <- gis_nuts[,c(2,4,6,8,11,13,14)]
-colnames(gis.nuts)[5] <- "nuts3"
-gis.hsu2_nuts <- na.omit(merge(hsu2_nuts,gis.nuts))
-gis.hsu2_nuts <- gis.hsu2_nuts[,-5]
-save(gis.hsu2_nuts,file="gis.hsu2_nuts.rdata")
-load(file="gis.hsu2_nuts.rdata")
-gis.hsu2_nuts1 <- gis.hsu2_nuts
-colnames(gis.hsu2_nuts1)[6:9] <- c("s_gisco2010nuts0","s_gisco2010nuts1","s_gisco2010nuts2","s_gisco2010nuts3")
-gis.hsu2 <- gis.hsu2_nuts1[,c(4,6:9)]
-colnames(gis.hsu2)[1] <- "Spatial_unit"
-gis.hsu2$Spatial_unit <- paste0("U",gis.hsu2$Spatial_unit,sep="")
-gis.nuts3 <- gis.hsu2_nuts1[,c(1,6:9)]
-colnames(gis.nuts3)[1] <- "Spatial_unit"
-gis.nuts2 <- gis.hsu2_nuts1[,c(5,6:9)]
-colnames(gis.nuts2)[1] <- "Spatial_unit"
-gis.capri.nuts2 <- gis.hsu2_nuts1[,c(2,6:9)]
-colnames(gis.capri.nuts2)[1] <- "Spatial_unit"
-ciao <- rbind(gis.hsu2,gis.nuts3,gis.nuts2,gis.capri.nuts2)
-ciao$not_to_use <- "1"
-ciao$not_to_use <- as.numeric(ciao$not_to_use)
-symDim <- 6 
-attr(ciao,"symName") <- "m_gisco2010_nuts3_2_1_0"
-lst <- wgdx.reshape(ciao,symDim,tName="not_to_use")
-wgdx.lst("gisco.hsu.nuts.gdx",lst)
+#memory.limit(size = 2048000)
 
-#wet deposition for OXN, RDN, and SOX
+# WET DEPOSITION FOR OXN
 
-#Wet deposition OXN
-wdep.oxn <- read.csv(file = "USCIE_EMEP_HSU2_CTRY_WDEP_OXN.csv") #load csv file linking uscie and OXN wet deposition, dataset coming from capri/dat/capdis/uscie
-wdep.oxn1 <- wdep.oxn[,c(3,4,7:11)]
-colnames(wdep.oxn1)[1:2] <- c("hsu2","nuts3")
-save(wdep.oxn1,file = "wdep.oxn.rdata")
-load(file = "wdep.oxn.rdata")
-hsu2_nuts1 <- hsu2_nuts[,c(1,2,3:6)]
-hsu2_nuts1$hsu2 <- as.factor(hsu2_nuts1$hsu2)
-wdep.oxn.nuts <- join(wdep.oxn1,hsu2_nuts1)
-wdep.oxn.hsu2 <- ddply(wdep.oxn.nuts,"hsu2",function(df)data.frame(WDON06=weighted.mean(df$WDON06,df$area),WDON07=weighted.mean(df$WDON07,df$area),WDON08=weighted.mean(df$WDON08,df$area),WDON09=weighted.mean(df$WDON09,df$area),WDON10=weighted.mean(df$WDON10,df$area)))
-colnames(wdep.oxn.hsu2)[1] <- "Spatial_unit"
-wdep.oxn.hsu2$Spatial_unit <- paste0("U",wdep.oxn.hsu2$Spatial_unit,sep="")
-wdep.oxn.nuts3 <- ddply(wdep.oxn.nuts,"nuts3",function(df)data.frame(WDON06=mean(df$WDON06),WDON07=mean(df$WDON07),WDON08=mean(df$WDON08),WDON09=mean(df$WDON09),WDON10=mean(df$WDON10)))
-colnames(wdep.oxn.nuts3)[1]="Spatial_unit"
-wdep.oxn.nuts2 <- ddply(na.omit(wdep.oxn.nuts),"nuts2",function(df)data.frame(WDON06=mean(df$WDON06),WDON07=mean(df$WDON07),WDON08=mean(df$WDON08),WDON09=mean(df$WDON09),WDON10=mean(df$WDON10)))
-colnames(wdep.oxn.nuts2)[1]="Spatial_unit"
-wdep.oxn.caprinuts <- ddply(na.omit(wdep.oxn.nuts),"CAPRI_NUTSII",function(df)data.frame(WDON06=mean(df$WDON06),WDON07=mean(df$WDON07),WDON08=mean(df$WDON08),WDON09=mean(df$WDON09),WDON10=mean(df$WDON10)))
-colnames(wdep.oxn.caprinuts)[1]="Spatial_unit"
-wdep.oxn.hsu.nuts <- rbind(wdep.oxn.hsu2,wdep.oxn.nuts3,wdep.oxn.nuts2,wdep.oxn.caprinuts)
-save(wdep.oxn.hsu.nuts,file = "wdep.oxn.hsu.nuts.rdata")
+wdep.oxn <- fread("USCIE_EMEP_HSU2_CTRY_WDEP_OXN.csv") #load csv file linking uscie and OXN wet deposition, dataset coming from capri/dat/capdis/uscie
+setkey(wdep.oxn, "USCIE_RC") # to set a key column of the DataTable
+
+wdep_oxn_uscie <- wdep.oxn[, c(1, 7:11), with=FALSE]
+names(wdep_oxn_uscie)[1] <- "s_uscierc"
+remove(wdep.oxn)
+
+#No need to dcast, it's already in "wide form"
 
 
-#Wet deposition RDN
-wdep.rdn <- read.csv(file = "USCIE_EMEP_HSU2_CTRY_WDEP_RDN.csv") #load csv file linking uscie and RDN wet deposition, dataset coming from capri/dat/capdis/uscie
-wdep.rdn1 <- wdep.rdn[,c(3,4,7:11)]
-colnames(wdep.rdn1)[1:2] <- c("hsu2","nuts3")
-save(wdep.rdn1,file = "wdep.rdn.rdata")
-load(file = "wdep.rdn.rdata")
-hsu2_nuts1 <- hsu2_nuts[,c(1,2,3:6)]
-wdep.rdn.nuts <- join(wdep.rdn1,hsu2_nuts1)
-wdep.rdn.nuts$hsu2 <- as.factor(wdep.rdn.nuts$hsu2)
-wdep.rdn.hsu2 <- ddply(wdep.rdn.nuts,"hsu2",function(df)data.frame(WDRN06=weighted.mean(df$WDRN06,df$area),WDRN07=weighted.mean(df$WDRN07,df$area),WDRN08=weighted.mean(df$WDRN08,df$area),WDRN09=weighted.mean(df$WDRN09,df$area),WDRN10=weighted.mean(df$WDRN10,df$area)))
-colnames(wdep.rdn.hsu2)[1] <- "Spatial_unit"
-wdep.rdn.hsu2$Spatial_unit <- paste0("U",wdep.rdn.hsu2$Spatial_unit,sep="")
-wdep.rdn.nuts3 <- ddply(wdep.rdn.nuts,"nuts3",function(df)data.frame(WDRN06=mean(df$WDRN06),WDRN07=mean(df$WDRN07),WDRN08=mean(df$WDRN08),WDRN09=mean(df$WDRN09),WDRN10=mean(df$WDRN10)))
-colnames(wdep.rdn.nuts3)[1] <- "Spatial_unit"
-wdep.rdn.nuts2 <- ddply(na.omit(wdep.rdn.nuts),"nuts2",function(df)data.frame(WDRN06=mean(df$WDRN06),WDRN07=mean(df$WDRN07),WDRN08=mean(df$WDRN08),WDRN09=mean(df$WDRN09),WDRN10=mean(df$WDRN10)))
-colnames(wdep.rdn.nuts2)[1] <- "Spatial_unit"
-wdep.rdn.caprinuts <- ddply(na.omit(wdep.rdn.nuts),"CAPRI_NUTSII",function(df)data.frame(WDRN06=mean(df$WDRN06),WDRN07=mean(df$WDRN07),WDRN08=mean(df$WDRN08),WDRN09=mean(df$WDRN09),WDRN10=mean(df$WDRN10)))
-colnames(wdep.rdn.caprinuts)[1] <- "Spatial_unit"
-wdep.rdn.hsu.nuts <- rbind(wdep.rdn.hsu2,wdep.rdn.nuts3,wdep.rdn.nuts2,wdep.rdn.caprinuts)
-save(wdep.rdn.hsu.nuts,file = "wdep.rdn.hsu.nuts.rdata")
-#load(file = "wdep.rdn.hsu.nuts.rdata")
+# Running Function 3: Preparing data set to run function 1
 
-#Wet deposition SOX
-wdep.sox <- read.csv(file = "USCIE_EMEP_HSU2_CTRY_WDEP_SOX.csv") #load csv file linking uscie and SOX wet deposition, dataset coming from capri/dat/capdis/uscie
-wdep.sox1 <- wdep.sox[,c(3,4,7:11)]
-colnames(wdep.sox1)[1:2] <- c("hsu2","nuts3")
-save(wdep.sox1,file = "wdep.sox.rdata")
-load(file = "wdep.sox.rdata")
-hsu2_nuts1 <- hsu2_nuts[,c(1,2,3:6)]
-hsu2_nuts1$hsu2 <- as.factor(hsu2_nuts1$hsu2)
-wdep.sox.nuts <- join(wdep.sox1,hsu2_nuts1)
-wdep.sox.hsu2 <- ddply(wdep.sox.nuts,"hsu2",function(df)data.frame(WDOS06=weighted.mean(df$WDOS06,df$area),WDOS07=weighted.mean(df$WDOS07,df$area),WDOS08=weighted.mean(df$WDOS08,df$area),WDOS09=weighted.mean(df$WDOS09,df$area),WDOS10=weighted.mean(df$WDOS10,df$area)))
-colnames(wdep.sox.hsu2)[1]="Spatial_unit"
-wdep.sox.hsu2$Spatial_unit <- paste0("U",wdep.sox.hsu2$Spatial_unit,sep="")
-wdep.sox.nuts3 <- ddply(wdep.sox.nuts,"nuts3",function(df)data.frame(WDOS06=mean(df$WDOS06),WDOS07=mean(df$WDOS07),WDOS08=mean(df$WDOS08),WDOS09=mean(df$WDOS09),WDOS10=mean(df$WDOS10)))
-colnames(wdep.sox.nuts3)[1]="Spatial_unit"
-wdep.sox.nuts2 <- ddply(na.omit(wdep.sox.nuts),"nuts2",function(df)data.frame(WDOS06=mean(df$WDOS06),WDOS07=mean(df$WDOS07),WDOS08=mean(df$WDOS08),WDOS09=mean(df$WDOS09),WDOS10=mean(df$WDOS10)))
-colnames(wdep.sox.nuts2)[1]="Spatial_unit"
-wdep.sox.caprinuts <- ddply(na.omit(wdep.sox.nuts),"CAPRI_NUTSII",function(df)data.frame(WDOS06=mean(df$WDOS06),WDOS07=mean(df$WDOS07),WDOS08=mean(df$WDOS08),WDOS09=mean(df$WDOS09),WDOS10=mean(df$WDOS10)))
-colnames(wdep.sox.caprinuts)[1]="Spatial_unit"
-wdep.sox.hsu.nuts <- rbind(wdep.sox.hsu2,wdep.sox.nuts3,wdep.sox.nuts2,wdep.sox.caprinuts)
-save(wdep.sox.hsu.nuts,file = "wdep.sox.hsu.nuts.rdata")
+wdep_oxn <- func3(wdep_oxn_uscie)
+remove(wdep_oxn_uscie)
+
+# Running Function1: 
+
+# Statistics can be computed aggregating data either by USCIE or by HSU2
+# By USCIE
+wdep_oxn_uscie_nuts <- func1(wdep_oxn, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("WDON06", "WDON07", "WDON08", "WDON09", "WDON10"), filenm4gdx = "wdep_oxn_uscie_stats", na.rm=TRUE)
+
+# By HSU2
+wdep_oxn_hsu_nuts <- func1(wdep_oxn, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("WDON06", "WDON07", "WDON08", "WDON09", "WDON10"), filenm4gdx = "wdep_oxn_hsu_stats", na.rm=TRUE)
+
+
+save(wdep_oxn_uscie_nuts, file="wdep_oxn_uscie_nuts.rdata")
+save(wdep_oxn_hsu_nuts, file="wdep_oxn_hsu_nuts.rdata")
+
+#remove(wdep_oxn)
+remove(wdep_oxn_uscie_nuts)
+remove(wdep_oxn_hsu_nuts)
+gc()
+
+
+
+
+
+# WET DEPOSITION FOR RDN
+
+wdep.rdn <- fread("USCIE_EMEP_HSU2_CTRY_WDEP_RDN.csv") #load csv file linking uscie and RDN wet deposition, dataset coming from capri/dat/capdis/uscie
+setkey(wdep.rdn, "USCIE_RC") # to set a key column of the DataTable
+
+wdep_rdn_uscie <- wdep.rdn[, c(1, 7:11), with=FALSE]
+names(wdep_rdn_uscie)[1] <- "s_uscierc"
+remove(wdep.rdn)
+gc()
+#No need to dcast, it's already in "wide form"
+
+# Running Function 3: Preparing data set to run function 1
+
+wdep_rdn <- func3(wdep_rdn_uscie)
+remove(wdep_rdn_uscie)
+gc()
+
+# Running Function1: 
+
+# Statistics can be computed aggregating data either by USCIE or by HSU2
+# By USCIE
+wdep_rdn_uscie_nuts <- func1(wdep_rdn, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("WDRN06", "WDRN07", "WDRN08", "WDRN09", "WDRN10"), filenm4gdx = "wdep_rdn_uscie_stats", na.rm=TRUE)
+
+# By HSU2
+wdep_rdn_hsu_nuts <- func1(wdep_rdn, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("WDRN06", "WDRN07", "WDRN08", "WDRN09", "WDRN10"), filenm4gdx = "wdep_rdn_hsu_stats", na.rm=TRUE)
+
+
+save(wdep_rdn_uscie_nuts, file="wdep_rdn_uscie_nuts.rdata")
+save(wdep_rdn_hsu_nuts, file="wdep_rdn_hsu_nuts.rdata")
+
+#remove(wdep_rdn)
+remove(wdep_rdn_uscie_nuts)
+remove(wdep_rdn_hsu_nuts)
+gc()
+
+
+
+
+
+# WET DEPOSITION FOR SOX
+
+wdep.sox <- fread("USCIE_EMEP_HSU2_CTRY_WDEP_SOX.csv") #load csv file linking uscie and SOX wet deposition, dataset coming from capri/dat/capdis/uscie
+setkey(wdep.sox, "USCIE_RC") # to set a key column of the DataTable
+
+wdep_sox_uscie <- wdep.sox[, c(1, 7:11), with=FALSE]
+names(wdep_sox_uscie)[1] <- "s_uscierc"
+remove(wdep.sox)
+gc()
+#No need to dcast, it's already in "wide form"
+
+# Running Function 3: Preparing data set to run function 1
+
+wdep_sox <- func3(wdep_sox_uscie)
+remove(wdep_sox_uscie)
+gc()
+
+# Running Function1: 
+
+# Statistics can be computed aggregating data either by USCIE or by HSU2
+# By USCIE
+wdep_sox_uscie_nuts <- func1(wdep_sox, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("WDOS06", "WDOS07", "WDOS08", "WDOS09", "WDOS10"), filenm4gdx = "wdep_sox_uscie_stats", na.rm=TRUE)
+# By HSU2
+wdep_sox_hsu_nuts <- func1(wdep_sox, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("WDOS06", "WDOS07", "WDOS08", "WDOS09", "WDOS10"), filenm4gdx = "wdep_sox_hsu_stats", na.rm=TRUE)
+
+
+save(wdep_sox_uscie_nuts, file="wdep_sox_uscie_nuts.rdata")
+save(wdep_sox_hsu_nuts, file="wdep_sox_hsu_nuts.rdata")
+
+remove(wdep_sox)
+remove(wdep_sox_uscie_nuts)
+remove(wdep_sox_hsu_nuts)
+gc()
+
+
+
+
+
+
+
+
+
+
+
 
 #all wet deposition
 load(file = "wdep.oxn.hsu.nuts.rdata")
@@ -821,5 +853,32 @@ wgdx.lst("lucas.hsu.nuts.gdx",lst)
 
 
 
+
+#gisconuts
+gis_nuts <- read.csv(file="LINK_HSU2_CAPRI_GISCO2010_NUTS_CODES_uniqueGISCO2010.csv") #load of new hsu and gisconuts
+gis.nuts <- gis_nuts[,c(2,4,6,8,11,13,14)]
+colnames(gis.nuts)[5] <- "nuts3"
+gis.hsu2_nuts <- na.omit(merge(hsu2_nuts,gis.nuts))
+gis.hsu2_nuts <- gis.hsu2_nuts[,-5]
+save(gis.hsu2_nuts,file="gis.hsu2_nuts.rdata")
+load(file="gis.hsu2_nuts.rdata")
+gis.hsu2_nuts1 <- gis.hsu2_nuts
+colnames(gis.hsu2_nuts1)[6:9] <- c("s_gisco2010nuts0","s_gisco2010nuts1","s_gisco2010nuts2","s_gisco2010nuts3")
+gis.hsu2 <- gis.hsu2_nuts1[,c(4,6:9)]
+colnames(gis.hsu2)[1] <- "Spatial_unit"
+gis.hsu2$Spatial_unit <- paste0("U",gis.hsu2$Spatial_unit,sep="")
+gis.nuts3 <- gis.hsu2_nuts1[,c(1,6:9)]
+colnames(gis.nuts3)[1] <- "Spatial_unit"
+gis.nuts2 <- gis.hsu2_nuts1[,c(5,6:9)]
+colnames(gis.nuts2)[1] <- "Spatial_unit"
+gis.capri.nuts2 <- gis.hsu2_nuts1[,c(2,6:9)]
+colnames(gis.capri.nuts2)[1] <- "Spatial_unit"
+ciao <- rbind(gis.hsu2,gis.nuts3,gis.nuts2,gis.capri.nuts2)
+ciao$not_to_use <- "1"
+ciao$not_to_use <- as.numeric(ciao$not_to_use)
+symDim <- 6 
+attr(ciao,"symName") <- "m_gisco2010_nuts3_2_1_0"
+lst <- wgdx.reshape(ciao,symDim,tName="not_to_use")
+wgdx.lst("gisco.hsu.nuts.gdx",lst)
 
 
