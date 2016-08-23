@@ -1,4 +1,5 @@
 #Used Packages
+rm(list=objects())
 library(data.table)
 library(plyr)
 library(dplyr)    #installed the dev version from https://github.com/hadley/dplyr
@@ -14,14 +15,16 @@ usciedatapath<-paste0(usciedatapath,"hsu2_database_update_2016_02orig/")
 # These databases have been updated by Renate Koeble and delivered in the folder capri/hsu2_database_update_2016_02
 if(Sys.info()[4]=="L01RI1203587"){ #checks machine name
     gamspath<-"C:/GAMS/win64/24.4"
-    workpath<-"x:/adrian/tools/rprojects/gisdata4caprihsu/"
+    workpath<-"C:/adrian/tools/rprojects/gisdata4caprihsu/"
+    capridat<-"C:/adrian/models/capri/trunk20160810/dat/capdis/hsu2/"
 }else if(Sys.info()[4]=="D01RI1600881"){ #checks machine name
     gamspath<-"C:/GAMS/win64/24.4"
     workpath<-"x:/adrian/tools/rprojects/gisdata4caprihsu/"
-    
+    capridat<-"x:/adrian/models/capri/trunk20160810/dat/capdis/hsu2/"
 }else{
-    workpath<-"X:/MARS_disaggregation/hsu2_statistics_xavi/"
+    workpath<-"X:/MARS_disaggregation/hsu2_statistics_xavi"
     usciedatapath<-workpath
+    capridat<-workpath
     gamspath<-"X:/GAMS/win64/24.7"
 }
 
@@ -288,19 +291,18 @@ func2 <- function(x){
 
 
 
-## Function 3: Preparing data set to run function 1
+## Function 3: preparedata - Preparing data set to run function 1
 
 # NOTES FOR THIS FUNCTION: 
 # It relates the data set with HSU2 (if it is based on USCIE) and NUTS. Also adds HSU areas
 # The first argument (x) is the data set (DataFrame)
-# Colname for USCIE codes has to be "s_uscierc". For HSU2 codes, "s_hsu2". For MARS GRID, "grid"
+# Colname for USCIE codes has to be "s_uscierc". For HSU2 codes, "hsu". For MARS GRID, "grid"
 
 
-func3 <- function(x){
+preparedata <- function(x){
     
     print("Running function 3...")
-    
-    nmt <- deparse(substitute(x))
+    nmt <- deparse(substitute(x)) # To capture the name of x as charactre (but as it is ALWAYS x this is not required?)
     
     if(any(grepl("s_uscierc", names(x))==TRUE)){  #to add HSU2, their areas, and NUTS data
         
@@ -310,27 +312,30 @@ func3 <- function(x){
         x2 <- as.data.table(x) # to transform x to a DataTable
         setkeyv(x2, "s_uscierc") # to set a key column
         
-        usciehsu_x2 <- merge(x2, hsu_uscie1, by="s_uscierc", all.x=TRUE) #to join of old gdx file with new hsu. Type of joining "left"
+        
+        usciehsu_x2 <- merge(x2, uscie_hsu, by="s_uscierc", all.x=TRUE) #to join of old gdx file with new hsu. Type of joining "left"
         gc()
         usciehsu_x2$s_uscierc <- factor(usciehsu_x2$s_uscierc) # to transform the column to factor
-        usciehsu_x2$s_hsu2 <- factor(usciehsu_x2$s_hsu2) # to transform the column to factor
-        setkey(usciehsu_x2, "s_hsu2") # to set a key column
+        usciehsu_x2$hsu <- factor(usciehsu_x2$hsu) # to transform the column to factor
+        setkey(usciehsu_x2, "hsu") # to set a key column
         
-        x3 <- merge(usciehsu_x2, hsu2_nuts, by.y="s_hsu2", by.x="s_hsu2", all.x=TRUE)
-        setnames(x3, old="s_hsu2", new="hsu2")
+        x3 <- merge(usciehsu_x2, hsu2_nuts, by.y="hsu", by.x="hsu", all.x=TRUE)
+        #stsetnames(x3, old="hsu", new="hsu2")
         
         
-    }else if(any(grepl("s_hsu2", names(x))==TRUE)){  #to add hsu2 areas and NUTS data
+    }else if(any(grepl("hsu", names(x))==TRUE)){  #to add hsu2 areas and NUTS data
         
         print(paste0("Relating ", nmt, " with NUTS codes"))  
-        x$s_hsu2 <- gsub("U", "", x$s_hsu2)
-        #x$s_hsu2 <- as.numeric(as.character(x$s_hsu2)) # to transform the column to numeric
+        #al20160823 - why do you add the 'U' here (and not for case 'uscie'? could be left out until file save as gdx?)
+        #x$hsu <- gsub("U", "", x$hsu)
+        #x$hsu <- as.numeric(as.character(x$hsu)) # to transform the column to numeric
         x2 <- as.data.table(x) # to transform x to a DataTable
-        setkeyv(x2, "s_hsu2") # to set a key column
+        #al20160823 - you transform to factor before above .. why not here?
+        setkeyv(x2, "hsu") # to set a key column
         gc()
         
-        x3 <- merge(x2, hsu2_nuts, by.x="s_hsu2", by.y="s_hsu2", all.x=TRUE)
-        setnames(x3, old="s_hsu2", new="hsu2")
+        x3 <- merge(x2, hsu2_nuts, by.x="hsu", by.y="hsu", all.x=TRUE)
+        #setnames(x3, old="hsu", new="hsu2")
         
         
     }else if(any(grepl("grid", names(x))==TRUE)){  #to add HSU2 and NUTS codes, and hsu2 areas
@@ -342,7 +347,7 @@ func3 <- function(x){
     }else{
         
         print("Unknown spatial units of the data")
-        print("You can choose 's_uscierc', 's_hsu2' or 'grid' as column name")
+        print("You can choose 's_uscierc', 'hsu' or 'grid' as column name")
     }
     
     print("End of function 3")
@@ -352,86 +357,99 @@ func3 <- function(x){
 
 
 dataprep<-paste0(usciedatapath,"Uscie_hsu2_nuts.rdata")
-
-if(file.exists(dataprep)){
-    load(file = dataprep)
-  
-}else{
+if(! file.exists(dataprep)){
     ### Input 1: USCIE-HSU2 table  ####
     # It relates USCIE codes with HSU2 codes
     #coming from USCIE_HSU2.CSV. Reading the file directly from the CSV with fread(). 
-    hsu_uscie1 <- fread(paste0(usciedatapath,"USCIE_HSU2.csv"), header=TRUE) # fread() much faster than read.csv - output is a data table
-    names(hsu_uscie1) <- c("s_uscierc","s_hsu2")
-    setkey(hsu_uscie1, "s_uscierc") # to set a key column of the DataTable
-    
-    
-    #Export to a gdx file   #xavi: I'm not sure that it is correctly done
-    #al20160823 - i don't think the gdx generated is correct - but if this script works well (and fast)
-    #             we do not need the uscie's themselves in CAPRI data base any more!!
-    
-    #hsu_uscie1[is.na(hsu_uscie1)] <- 0    #to convert all NA's to 0
-    # symDim <- 2
-    # attr(hsu_uscie1,"symName") <- "hsu_uscie"
-    # attr(hsu_uscie1, "ts") <- "relates HSU2 codes and USCIE codes"   #explanatory text for the symName
-    # myText <- c("hsu2 code", "uscie code")     # explanatory text for the extracted index sets
-    # lst <- wgdx.reshape(hsu_uscie1, tName = "s_uscie", symDim, order=c(2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
-    # wgdx.lst("hsu2_uscie1", lst)
-    
-    
-    
-    #It relates HSU2 with old HSMU codes
-    #hsuhsmu <- rgdx.param("hsu_hsmu.gdx","p_hsu_hsmu")#load of gdx linking old and new hsu,dataset coming from capri/dat/capdis/hsu2
-    #hsuhsmu <- hsuhsmu[,1:2]
-    #names(hsuhsmu) <- c("hsu2","hsmu")
-    #hsuhsmu$hsu2 <- gsub("U","",hsuhsmu$hsu2)
-    #hsuhsmu$hsmu <- gsub("H|U|HE","",hsuhsmu$hsmu)
-    #head(hsuhsmu)
-    
+    uscie_hsu <- fread(paste0(usciedatapath,"USCIE_HSU2.csv"), header=TRUE) # fread() much faster than read.csv - output is a data table
+    names(uscie_hsu) <- c("s_uscierc","hsu")
+    setkey(uscie_hsu, "s_uscierc") # to set a key column of the DataTable
     
     ### Input 2: HSU2-NUTS-CAPRI  ####
     # It relates HSU2 codes with NUTS2(Eurostat codes), CAPRI_NUTSII, CAPRI_NUTS0 (countries). It also include the area of each HSU
     hsu2_nuts3 <- fread(paste0(usciedatapath,"HSU2_DEFPARAM.csv"), header=TRUE,select=c("HSU2_IDRUN","HSU2_TOTAR","ADMIN_EEZ","SMU")) 
     #hsu2_nuts3 <- as.data.table(hsu2[ , c(2,3,11,22), with=FALSE])  #to select the columns of the DT
-    setnames(hsu2_nuts3,old=c("HSU2_IDRUN","HSU2_TOTAR","ADMIN_EEZ","SMU"),new=c("s_hsu2","area","nuts3","SMU")) #Same header as for the uscie table
-    setkey(hsu2_nuts3, "s_hsu2") # to set a key column of the DataTable
-    
+    setnames(hsu2_nuts3,old=c("HSU2_IDRUN","HSU2_TOTAR","ADMIN_EEZ","SMU"),new=c("hsu","area","nuts3","SMU")) #Same header as for the uscie table
+    setkey(hsu2_nuts3, "hsu") # to set a key column of the DataTable
     
     ### Input 3: CAPRI NUTS ####
+    #al20160823 - original file is *csv
+    #nuts_capri <- fread(paste0(usciedatapath,"HSU2_NUTS_TO_CAPRI_NUTS_CODES.txt"), header=TRUE) 
+    #setkey(nuts_capri, "nuts3") # to set a key column of the DataTable
     nuts_capri <- fread(paste0(usciedatapath,"HSU2_NUTS_TO_CAPRI_NUTS_CODES.csv"), header=TRUE,drop="CAPRI_MS") 
     setnames(nuts_capri,old = c("ADMIN_EEZ","NURGCDL2"),new = c("nuts3","nuts2")) #keep CAPRI_NUTSII,CAPRI_NUTS0
     setkey(nuts_capri, "nuts3") # to set a key column of the DataTable
     hsu2_nuts <- merge(hsu2_nuts3, nuts_capri, by.x = "nuts3", by.y = "nuts3", all.x = TRUE)
     rm(hsu2_nuts3,nuts_capri) #Not needed any more
-    hsu2_nuts$s_hsu2 <- factor(hsu2_nuts$s_hsu2) # to transform the column to factor
-    setkey(hsu2_nuts, "s_hsu2") # to set a key column
-    #Export to a gdx file
-    hsu2_nuts <- hsu2_nuts[complete.cases(hsu2_nuts), ]  # to remove NA's
-    symDim <- 7
-    attr(hsu2_nuts,"symName") <- "hsu_nuts_capri"
-    attr(hsu2_nuts, "ts") <- "relates HSU2 codes (and areas) with NUTS2, CAPRI_NUTSII, CAPRI_NUTS0"   #explanatory text for the symName
-    myText <- c("country code","nuts2 code of capri","nuts2 code","soil mapping unit","hsu2 code", "nuts3 code","area of hsu2")     # explanatory text for the extracted index sets
-    lst <- wgdx.reshape(hsu2_nuts, symDim,tName = "area", setsToo=TRUE,order=c(7,6,5,4,2,1,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
-    wgdx.lst("hsu2_nuts1", lst)
     
-
+    hsu2_nuts$hsu <- factor(hsu2_nuts$hsu) # to transform the column to factor
+    setkey(hsu2_nuts, "hsu") # to set a key column
+    
     ### Input 4: Fraction of MARS-GRID per HSU2 ####
     #load csv file linking uscie and grid numbers, dataset coming from capri/dat/capdis/uscie
     uscie_marsgrid <- fread(paste0(usciedatapath,"../hsu2_database_togdx_201605_nocita/","USCIE_PARAM.csv"), header=TRUE,select=c(1, 3)) 
     setnames(uscie_marsgrid,old=c("USCIE_RC","GRIDNO"),new=c("s_uscierc","marsgrid"))
-    # Merge uscie - marsgrid - with HSU2; eliminate empty HSU2 and MARS-grids
-    setkey(hsu_uscie1,"s_uscierc")
-    setkey(uscie_marsgrid,"s_uscierc")
-    hsu_uscie_marsgrid <- hsu_uscie1[uscie_marsgrid][!is.na(s_hsu2)&marsgrid!=0]
-    hsu_uscie_marsgrid<-hsu_uscie_marsgrid[,.(area=.N),by=.(s_hsu2,marsgrid)]
-    hsu_uscie_marsgrid<-hsu_uscie_marsgrid[,`:=`(gridarea=sum(area)),by=s_hsu2]
-    # Fraction of HSU2 that belongs to a certain MARSGRID
-    hsu_uscie_marsgrid<-hsu_uscie_marsgrid[,`:=`(fraction=area/gridarea)]
     
-    ### Save data in rdata format ####
-    save(hsu2_nuts,hsu_uscie1,hsu_uscie_marsgrid,file=dataprep)
+    # Merge uscie - marsgrid - with HSU2; eliminate empty HSU2 and MARS-grids
+    setkey(uscie_hsu,"s_uscierc")
+    setkey(uscie_marsgrid,"s_uscierc")
+    marsgrid_hsu <- uscie_hsu[uscie_marsgrid][!is.na(hsu)&marsgrid!=0]
+    marsgrid_hsu<-marsgrid_hsu[,.(area=.N),by=.(hsu,marsgrid)]
+    marsgrid_hsu<-marsgrid_hsu[,`:=`(gridarea=sum(area)),by=hsu]
+    # Fraction of HSU2 that belongs to a certain MARSGRID
+    marsgrid_hsu<-marsgrid_hsu[,`:=`(fraction=area/gridarea)]
+    
+    
+    #### 5. Export to a gdx file ####
+    
+    hsu2export <- hsu2_nuts[complete.cases(hsu2_nuts), ]  # to remove NA's
+    hsu2export$hsu<-paste0("U",hsu2export$hsu)
+    
+    symDim <- 7
+    attr(hsu2export,"symName") <- "hsu_nuts_capri"
+    attr(hsu2export, "ts") <- "relates HSU2 codes (and areas) with NUTS2, CAPRI_NUTSII, CAPRI_NUTS0"   #explanatory text for the symName
+    myText <- c("country code","nuts2 code of capri","nuts2 code","soil mapping unit","nuts3 code","hsu2 code","area of hsu2")     # explanatory text for the extracted index sets
+    lst <- wgdx.reshape(hsu2export, symDim,tName = "area", setsToo=FALSE,order=c(7,6,5,4,2,1,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+    
+    # Add sets to include
+    shsu<-hsu2export$hsu
+    hsu2set<-list(name='s_hsu',ts='List of HSU codes',uels=list(shsu),type='set',dim=1,form='full')
+    ssmu<-unique(hsu2export$SMU)
+    smuset<-list(name='s_smu',ts='List of soil mapping units',uels=list(ssmu),type='set',dim=1,form='full')
+
+    nutsexport<-unique(hsu2export[,.(nuts2,CAPRI_NUTSII,CAPRI_NUTS0,nHSU=.N,areanuts3_km2=sum(area/1000000)),by=nuts3])
+    snuts3<-nutsexport$nuts3
+    nuts3set<-list(name='s_nuts3',ts='List of ADMIN_EEZ codes, level NUTS3',uels=list(snuts3),type='set',dim=1,form='full')
+    snuts2<-nutsexport$nuts2
+    nuts2set<-list(name='s_nuts2',ts='List of ADMIN_EEZ codes, level nuts2',uels=list(snuts2),type='set',dim=1,form='full')
+    
+    scaprinuts2<-unique(nutsexport$CAPRI_NUTSII)
+    scaprinuts2set<-list(name='s_srnuts2',ts='List of CAPRI NUTS2 available for HSU',uels=list(scaprinuts2),type='set',dim=1,form='full')
+    scapricountries<-unique(nutsexport$CAPRI_NUTS0)
+    scapricountriesset<-list(name='s_countries',ts='List of CAPRI countries available for HSU',uels=list(scapricountries),type='set',dim=1,form='full')
+    
+    mnuts3nuts2<-unique(nutsexport[,.(nuts3,nnuts3=.N,areanuts3_km2),by=nuts2])
+    mnuts3nuts2$nnuts3<-as.numeric(mnuts3nuts2$nnuts3)
+    attr(mnuts3nuts2,"symName") <- "m_nuts3_nuts2"
+    attr(mnuts3nuts2, "ts") <- "Map between ADMIN_EEA codes between level NUTS3 and level NUTS2"
+    mn3 <- wgdx.reshape(mnuts3nuts2, symDim=3,tName = "pnuts3", setsToo=FALSE,order=NULL)
+
+    mnuts3srnuts2<-unique(nutsexport[CAPRI_NUTSII!="",.(nuts3,nnuts3=.N,areanuts3_km2),by=CAPRI_NUTSII])
+    mnuts3srnuts2$nnuts3<-as.numeric(mnuts3srnuts2$nnuts3)
+    attr(mnuts3srnuts2,"symName") <- "m_nuts3_srnuts2"
+    attr(mnuts3srnuts2, "ts") <- "Map between ADMIN_EEA codes between level NUTS3 and CAPRI NUTS2"
+    mn2 <- wgdx.reshape(mnuts3srnuts2, symDim=3,tName = "pnuts3", setsToo=FALSE,order=NULL)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+
+    wgdx.lst("hsu2_nuts1", lst,hsu2set,nuts3set,nuts2set,smuset,scaprinuts2set,scapricountriesset,mn3,mn2)
+    remove(hsu2_nuts)
+    
+    ### 6., Save data in rdata format ####
+    save(hsu2_nuts,uscie_hsu,marsgrid_hsu,mnuts3nuts2,mnuts3srnuts2,file=dataprep)
+    
+    
+}else{
+    load(file = dataprep)
 }
+    
 
-
-
-
-
+remove(hsu2_nuts3)

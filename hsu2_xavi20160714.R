@@ -3,7 +3,7 @@ source("X:/MARS_disaggregation/gisdata4caprihsu/hsu4capri_header.r") #this is on
 #source("hsu4capri_header.r")
 
 
-###### Input 3: Data to be computed #####
+###### Data to be computed #####
 
 
 
@@ -188,7 +188,7 @@ wgdx.lst("centroids_spatialunit", c(lst, lst1, lst2))
 
 #gdxInfo("forestshare.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
 #This dataset contains forest share data at USCIE level
-adf <- rgdx.param("forestshare.gdx","p_forshares") #load of gdx linking forest shares and USCIE numbers, dataset coming from capri/dat/capdis/hsu2
+adf <- rgdx.param(paste0(capridat,"forestshare.gdx"),"p_forshares") #load of gdx linking forest shares and USCIE numbers, dataset coming from capri/dat/capdis/hsu2
 names(adf) <- c("s_uscierc","s_years","value")
 adfm <- dcast(adf, s_uscierc ~ s_years, drop=TRUE, value.var="value")  #to split the years in two columns containing forshare info
 setnames(adfm, old = c("2000","2006"), new = c("f_2000", "f_2006")) # to change colnames
