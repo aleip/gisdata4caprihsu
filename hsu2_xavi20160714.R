@@ -13,14 +13,10 @@ hsu2_coo <- fread("HSU2_CENTER_COORDINATES.csv", header=TRUE) #load of csv file 
 colnames(hsu2_coo)[1] <- "hsu2"
 setkey(hsu2_coo, "hsu2") # to set a key column of the DataTable
 
-hsu2_coo_nuts <- merge(hsu2_nutsDT, hsu2_coo, by.x = "hsu2", by.y = "hsu2", all.x = TRUE)
-hsu2_coo_nuts$hsu2 <- paste0("U", hsu2_coo_nuts$hsu2)
+hsu2_coo_nuts <- merge(hsu2_nuts, hsu2_coo, by.x = "hsu", by.y = "hsu2", all.x = TRUE)
 
 #save(hsu2_coo_nuts, file = "hsu2_coo_nuts.rdata")
 #load(file = "hsu2_coo_nuts.rdata")
-
-head(hsu2_coo_nuts)
-
 
 
 ## Calculating centroids for nuts3
@@ -50,7 +46,7 @@ for (rw in 1:nrow(coo_mean_nuts3)){
   
   nearest_hsu <- hsu_coo_spunit[min_posit,]
   names(nearest_hsu)[1] <- "nearest_hsu"
-  print(nearest_hsu[1])
+  #print(nearest_hsu[1])
   
   if (any(is.na(nearest_hsu[1,])==TRUE)){
     nearesthsu2nuts3[rw, 1:3] <- c(NA, NA, NA)
@@ -62,6 +58,7 @@ for (rw in 1:nrow(coo_mean_nuts3)){
 nuts3_nearesthsu <- cbind(coo_mean_nuts3, nearesthsu2nuts3) 
 names(nuts3_nearesthsu) <- c("spatial_unit", "spunit_center_coor_x_m", "spunit_center_coor_y_m", "nearest_hsu", "nearest_hsu_coor_x_m", "nearest_hsu_coor_y_m")
 nuts3_nearesthsu <- nuts3_nearesthsu[complete.cases(nuts3_nearesthsu),]
+rm(coo_mean_nuts3, nearesthsu2nuts3, by_nuts3)
 
 
 
@@ -103,7 +100,7 @@ for (rw in 1:nrow(coo_mean_CAPRI_NUTSII)){
 
 caprinuts2_nearesthsu <- cbind(coo_mean_CAPRI_NUTSII, nearesthsu2nuts2) 
 names(caprinuts2_nearesthsu) <- c("spatial_unit", "spunit_center_coor_x_m", "spunit_center_coor_y_m", "nearest_hsu", "nearest_hsu_coor_x_m", "nearest_hsu_coor_y_m")
-
+rm(coo_mean_CAPRI_NUTSII, nearesthsu2nuts2, by_CAPRI_NUTSII)
 
 ## Calculating centroids for CAPRI NUTS0
 
@@ -143,14 +140,13 @@ for (rw in 1:nrow(coo_mean_CAPRI_NUTS0)){
 
 caprinuts0_nearesthsu <- cbind(coo_mean_CAPRI_NUTS0, nearesthsu2nuts0) 
 names(caprinuts0_nearesthsu) <- c("spatial_unit", "spunit_center_coor_x_m", "spunit_center_coor_y_m", "nearest_hsu", "nearest_hsu_coor_x_m", "nearest_hsu_coor_y_m")
-
+rm(coo_mean_CAPRI_NUTS0, nearesthsu2nuts0, by_CAPRI_NUTS0)
 
 
 # Exporting Centroids of Spatial Units to gdx
 
 centroids_spatialunit <- rbind(nuts3_nearesthsu, caprinuts2_nearesthsu, caprinuts0_nearesthsu)
-head(centroids_spatialunit)
-
+centroids_spatialunit$nearest_hsu <- paste0("U", centroids_spatialunit$nearest_hsu)
 
 save(centroids_spatialunit, file = "centroids_spatialunit.rdata")
 #load(file = "centroids_spatialunit.rdata")
@@ -176,9 +172,7 @@ lst2 <- wgdx.reshape(centroids_spatialunit2, symDim, order=c(1,0), tName = "s_hs
 
 
 wgdx.lst("centroids_spatialunit", c(lst, lst1, lst2))
-#wgdx.lst("centroids_spatialunit", c(lst))
-
-
+rm(centroids_spatialunit, centroids_spatialunit1, centroids_spatialunit2, caprinuts0_nearesthsu, hsu2_coo_nuts)
 
 
 
@@ -195,13 +189,12 @@ setnames(adfm, old = c("2000","2006"), new = c("f_2000", "f_2006")) # to change 
 
 ## Running Function 3: Preparing data set to run function 1
 
-forshare <- func3(adfm)
-
+forshare <- preparedata(adfm)
 
 ## Running Function 2: Computing statistis HSU-USCIE
 # how many USCIES per HSU (max, min, mean...)
 stats_hsu_uscie <- func2(forshare)
-#head(stats_hsu_uscie)
+save(stats_hsu_uscie, file="stats_hsu_uscie.rdata")
 
 
 ### Running Function1:
@@ -215,7 +208,9 @@ forest_hsu_nuts <- func1(forshare, data2ag = c("hsu"), functs = c("max", "min", 
 
 save(forest_uscie_nuts, file="forest_uscie_nuts.rdata")
 save(forest_hsu_nuts, file="forest_hsu_nuts.rdata")
-
+remove(forest_uscie_nuts)
+remove(forest_hsu_nuts)
+remove(adf, adfm, forshare, stats_hsu_uscie)
 
 
 
@@ -233,8 +228,7 @@ uscie_dem2 <- dcast(uscie_dem, s_uscierc ~ variables, drop=TRUE, value.var="valu
 
 ## Running Function 3: Preparing data set to run function 1
 
-dem <- func3(uscie_dem2)
-
+dem <- preparedata(uscie_dem2)
 
 ### Running Function1: 
 
@@ -249,6 +243,9 @@ dem_hsu_nuts <- func1(dem, data2ag = c("hsu"), functs = c("max", "min", "weighte
 save(dem_uscie_nuts, file="dem_uscie_nuts.rdata")
 #load(file = "dem_uscie_nuts.rdata")
 save(dem_hsu_nuts, file="dem_hsu_nuts.rdata")
+remove(dem_uscie_nuts)
+remove(dem_hsu_nuts)
+remove(uscie_dem, uscie_dem2, dem)
 
 
 
@@ -260,12 +257,12 @@ save(dem_hsu_nuts, file="dem_hsu_nuts.rdata")
 #gdxInfo("soil_hwsd.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
 #This dataset contains soil data at HSU2 level.
 adf_soil <- rgdx.param("soil_hwsd.gdx", "p_soildom")  #load of gdx linking soil properties and hsu, dataset coming from capri/dat/capdis/hsu2
-names(adf_soil) <- c("s_hsu2", "variables", "value")
-hsu2_soil <- dcast(adf_soil, s_hsu2 ~ variables, drop=TRUE, value.var="value")  #to split the variables in columns containing soil info
+names(adf_soil) <- c("hsu", "variables", "value")
+hsu2_soil <- dcast(adf_soil, hsu ~ variables, drop=TRUE, value.var="value")  #to split the variables in columns containing soil info
 
 ## Running Function 3: Preparing data set to run function 1
 
-soil <- func3(hsu2_soil)
+soil <- preparedata(hsu2_soil)
 
 
 ### Running Function1: 
@@ -335,23 +332,29 @@ yield_smth_hsu2_nuts <- func1(yield_smth_hsu, data2ag = c("hsu"), functs = c("ma
 
 
 #gdxInfo("uscie_irrishare.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
-#This dataset contains soil data at HSU2 level.
-uscie_irr <- rgdx.param("uscie_irrishare.gdx", "irr_share2000")  #load of gdx linking soil properties and hsu, dataset coming from capri/dat/capdis/hsu2
+#This dataset contains irrigation data at USCIE level.
+uscie_irr <- rgdx.param("uscie_irrishare.gdx", "irr_share2000")  #load of gdx linking irrigation data and hsu, dataset coming from capri/dat/capdis/hsu2
 names(uscie_irr) <- c("s_uscierc", "irr")
 #No need to dcast because there is only one variable
 
 ## Running Function 3: Preparing data set to run function 1
 
-irrishare <- func3(uscie_irr)
+irrishare <- preparedata(uscie_irr)
 
 
 ### Running Function1: 
-
+# Statistics can be computed aggregating data either by USCIE or by HSU2
+# By USCIE
 irr_uscie_nuts <- func1(irrishare, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = "irr", filenm4gdx = "irrishare_uscie_stats", na.rm=TRUE)
 
+# By HSU
+irr_hsu_nuts <- func1(irrishare, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = "irr", filenm4gdx = "irrishare_hsu_stats", na.rm=TRUE)
 
-save(irr_hsu_nuts, file="irr_uscie_nuts.rdata")
 
+save(irr_uscie_nuts, file="irr_uscie_nuts.rdata")
+save(irr_hsu_nuts, file="irr_hsu_nuts.rdata")
+
+rm(uscie_irr, irrishare, irr_uscie_nuts, irr_hsu_nuts)
 
 
 
