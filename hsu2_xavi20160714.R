@@ -583,7 +583,7 @@ wgdx.lst("marsmeteo.trimester.hsu.nuts.gdx",lst)
 
 # WET DEPOSITION FOR OXN
 
-wdep.oxn <- fread("USCIE_EMEP_HSU2_CTRY_WDEP_OXN.csv") #load csv file linking uscie and OXN wet deposition, dataset coming from capri/dat/capdis/uscie
+wdep.oxn <- fread(paste0(usciedatapath,"USCIE_EMEP_HSU2_CTRY_WDEP_OXN.csv")) #load csv file linking uscie and OXN wet deposition, dataset coming from capri/dat/capdis/uscie
 setkey(wdep.oxn, "USCIE_RC") # to set a key column of the DataTable
 
 wdep_oxn_uscie <- wdep.oxn[, c(1, 7:11), with=FALSE]

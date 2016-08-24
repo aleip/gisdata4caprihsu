@@ -356,7 +356,8 @@ preparedata <- function(x){
 } #End of func3
 
 
-dataprep<-paste0(usciedatapath,"Uscie_hsu2_nuts.rdata")
+dataprep<-paste0(usciedatapath,"uscie_hsu2_nuts_marsgrid.rdata")
+
 if(! file.exists(dataprep)){
     ### Input 1: USCIE-HSU2 table  ####
     # It relates USCIE codes with HSU2 codes
@@ -428,28 +429,37 @@ if(! file.exists(dataprep)){
     scapricountries<-unique(nutsexport$CAPRI_NUTS0)
     scapricountriesset<-list(name='s_countries',ts='List of CAPRI countries available for HSU',uels=list(scapricountries),type='set',dim=1,form='full')
     
-    mnuts3nuts2<-unique(nutsexport[,.(nuts3,nnuts3=.N,areanuts3_km2),by=nuts2])
-    mnuts3nuts2$nnuts3<-as.numeric(mnuts3nuts2$nnuts3)
-    attr(mnuts3nuts2,"symName") <- "m_nuts3_nuts2"
+    mnuts3nuts2<-unique(nutsexport[,.(nuts3,nHSU,areanuts3_km2),by=nuts2])
+    mnuts3nuts2$nHSU<-as.numeric(mnuts3nuts2$nHSU)
+    attr(mnuts3nuts2,"symName") <- "p_nuts3_nuts2"
     attr(mnuts3nuts2, "ts") <- "Map between ADMIN_EEA codes between level NUTS3 and level NUTS2"
     mn3 <- wgdx.reshape(mnuts3nuts2, symDim=3,tName = "pnuts3", setsToo=FALSE,order=NULL)
 
-    mnuts3srnuts2<-unique(nutsexport[CAPRI_NUTSII!="",.(nuts3,nnuts3=.N,areanuts3_km2),by=CAPRI_NUTSII])
-    mnuts3srnuts2$nnuts3<-as.numeric(mnuts3srnuts2$nnuts3)
-    attr(mnuts3srnuts2,"symName") <- "m_nuts3_srnuts2"
+    mnuts3srnuts2<-unique(nutsexport[CAPRI_NUTSII!="",.(nuts3,CAPRI_NUTS0,nHSU,areanuts3_km2),by=CAPRI_NUTSII])
+    mnuts3srnuts2$nHSU<-as.numeric(mnuts3srnuts2$nHSU)
+    attr(mnuts3srnuts2,"symName") <- "p_nuts3_srnuts2"
     attr(mnuts3srnuts2, "ts") <- "Map between ADMIN_EEA codes between level NUTS3 and CAPRI NUTS2"
-    mn2 <- wgdx.reshape(mnuts3srnuts2, symDim=3,tName = "pnuts3", setsToo=FALSE,order=NULL)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+    mn2 <- wgdx.reshape(mnuts3srnuts2, symDim=4,tName = "pnuts3", setsToo=FALSE,order=NULL)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
 
-    wgdx.lst("hsu2_nuts1", lst,hsu2set,nuts3set,nuts2set,smuset,scaprinuts2set,scapricountriesset,mn3,mn2)
-    remove(hsu2_nuts)
+    msrnuts2nuts0<-unique(mnuts3srnuts2[CAPRI_NUTSII!="",.(CAPRI_NUTS0,nHSU=sum(nHSU),nnuts3=.N,areanuts2_km2=sum(areanuts3_km2)),by=CAPRI_NUTSII])
+    msrnuts2nuts0$nnuts3<-as.numeric(msrnuts2nuts0$nnuts3)
+    attr(msrnuts2nuts0,"symName") <- "p_srnuts2_nuts0"
+    attr(msrnuts2nuts0, "ts") <- "Map between ADMIN_EEA codes between level NUTS3 and CAPRI NUTS2"
+    mn0 <- wgdx.reshape(msrnuts2nuts0, symDim=3,tName = "pnuts3", setsToo=FALSE,order=NULL)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+
+    mnuts0<-unique(msrnuts2nuts0[CAPRI_NUTS0!="",.(nHSU=sum(nHSU),nnuts3=sum(nnuts3),nnuts2=.N,areanuts0_km2=sum(areanuts2_km2)),by=CAPRI_NUTS0])
+    mnuts0$nnuts2<-as.numeric(mnuts0$nnuts2)
+    attr(mnuts0,"symName") <- "p_nuts0"
+    attr(mnuts0, "ts") <- "Map between ADMIN_EEA codes between level NUTS3 and CAPRI NUTS2"
+    mn <- wgdx.reshape(mnuts0, symDim=2,tName = "pnuts3", setsToo=FALSE,order=NULL)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+    
+    wgdx.lst("hsu2_nuts1", lst,hsu2set,nuts3set,nuts2set,smuset,scaprinuts2set,scapricountriesset,mn3,mn2,mn0,mn)
     
     ### 6., Save data in rdata format ####
-    save(hsu2_nuts,uscie_hsu,marsgrid_hsu,mnuts3nuts2,mnuts3srnuts2,file=dataprep)
-    
+    save(hsu2_nuts,uscie_hsu,marsgrid_hsu,mnuts3nuts2,mnuts3srnuts2,msrnuts2nuts0,mnuts0,file=dataprep)
+    rm(hsu2export,uscie_marsgrid)
     
 }else{
     load(file = dataprep)
 }
     
-
-remove(hsu2_nuts3)
