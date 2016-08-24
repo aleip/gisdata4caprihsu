@@ -22,7 +22,7 @@ if(Sys.info()[4]=="L01RI1203587"){ #checks machine name
     workpath<-"x:/adrian/tools/rprojects/gisdata4caprihsu/"
     capridat<-"x:/adrian/models/capri/trunk20160810/dat/capdis/hsu2/"
 }else{
-    workpath<-"X:/MARS_disaggregation/hsu2_statistics_xavi"
+    workpath<-"X:/MARS_disaggregation/hsu2_statistics_xavi/"
     usciedatapath<-workpath
     capridat<-workpath
     gamspath<-"X:/GAMS/win64/24.7"
@@ -46,7 +46,6 @@ igdx(gamspath)
 # filenm4gdx is to define the filename for the exported gdx
 
 
-# Comments al20160822 - func1 is not correct. the aggregation should always start with uscie - unless no 'uscies' are the start 
 
 agg2admins <- function(xprepared, 
                   data2ag="hsu", 
@@ -382,8 +381,9 @@ preparedata <- function(x){
         
         usciehsu_x2 <- merge(x2, uscie_hsu, by="s_uscierc", all.x=TRUE) #to join of old gdx file with new hsu. Type of joining "left"
         gc()
-        usciehsu_x2$s_uscierc <- factor(usciehsu_x2$s_uscierc) # to transform the column to factor
+        #xavi: this is not necessary #usciehsu_x2$s_uscierc <- factor(usciehsu_x2$s_uscierc) # to transform the column to factor
         usciehsu_x2$hsu <- factor(usciehsu_x2$hsu) # to transform the column to factor
+        #xavi: previous line is necessary to do the merge
         setkey(usciehsu_x2, "hsu") # to set a key column
         
         x3 <- merge(usciehsu_x2, hsu2_nuts, by.y="hsu", by.x="hsu", all.x=TRUE)
@@ -393,10 +393,12 @@ preparedata <- function(x){
         
         print(paste0("Relating ", nmt, " with NUTS codes"))  
         #al20160823 - why do you add the 'U' here (and not for case 'uscie'? could be left out until file save as gdx?)
+        #xavi: probably in previous versions it was needed here. Now it's ok where you moved it. For USCIE it wasn't necessary to start with a letter
         #x$hsu <- gsub("U", "", x$hsu)
         #x$hsu <- as.numeric(as.character(x$hsu)) # to transform the column to numeric
         x2 <- as.data.table(x) # to transform x to a DataTable
         #al20160823 - you transform to factor before above .. why not here?
+        #xavi: not necessary here because it's already a factor
         setkeyv(x2, "hsu") # to set a key column
         gc()
         
