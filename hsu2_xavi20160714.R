@@ -174,77 +174,13 @@ lst2 <- wgdx.reshape(centroids_spatialunit2, symDim, order=c(1,0), tName = "s_hs
 wgdx.lst("centroids_spatialunit", c(lst, lst1, lst2))
 #wgdx.lst("centroids_spatialunit", c(lst))
 
-loadgdxfile<-function(xfulln,parname=NULL){
-    pars<-as.data.table(gdxInfo(xfulln,dump=FALSE,returnList=FALSE,returnDF=TRUE)$parameters$name)
-    dims<-as.data.table(gdxInfo(xfulln,dump=FALSE,returnList=FALSE,returnDF=TRUE)$parameters$dim)
-    if(is.null(parname)){
-        if(length(pars)>1){
-            stop(paste("Data file contains several parameter, please indicate which ",pars,collapse="-"))
-        }else if (length(pars)==0){
-            stop(paste("Data file contains no parameter"))
-        }else{
-            parname<-as.character(pars)
-            dim<-as.numeric(dims)
-        }
-    }else{
-        dim<-as.numeric(dims[pars$V1==parname])
-    }
-    #rgdx returns i,j,... for each dim and writes the values into the column 'value'
-    gdxl<-c("j","k","l","m")
-    x <- as.data.table(rgdx.param(xfulln,parname))
-    fordcast<-as.formula(paste("i",paste(gdxl[1:(dim-1)],collapse="+"),sep="~"))
-    x <- dcast.data.table(x, fordcast, drop=TRUE, value.var="value")  #to split the years in two columns containing forshare info
-    return(list(x,dim,par))
-}
-
-processdata<-function(xfulln,oldn=NULL,newn=NULL,spatunit="s_uscierc",parname=NULL){
-    #x: data table that contains one row with the original unit and further rows with variables of the name 'newn'
-    #xn: part of the file names to be generated
-    #oldn: variable names as in original data
-    #newn: variable names as required in result files
-    
-    fileext<-strsplit(xfulln,"\\.")[[1]]
-    fileext<-fileext[length(fileext)]
-    
-    if(fileext=="gdx"){
-        # Load gdx-file (no other load-function has been develoed yet...)
-        x<-loadgdxfile(xfulln,parname=NULL)
-        dim<-x[[2]]
-        parname<-x[[3]]
-        xloaded<-x[[1]]
-    }else{
-        stop(paste0("No loading procedure for files with extension ",fileext," has been developed yet..."))
-    }
-    
-    #Assumed that uscie data are read - otherwise define in argument spatunit
-    #Attention: assumed also that the spatial unit is in the first dimesion!!
-    #Otherwise erroneous results will be produced
-    names(xloaded)[1]<-spatunit
-    numericnames<-grepl("^[0-9]*$",names(xloaded))
-    names(xloaded)[numericnames]<-paste0("f_",names(xloaded)[numericnames])
-    #setnames(x, old = oldn, new = newn)
-    xprepared <- preparedata(xloaded)
-    xstatistics <- computestatistics(xprepared)
-    x2agg<-"hsu" #default: data2ag="hsu"
-    xvbles<-names(xloaded)[dim:ncol(xloaded)]
-    xfuncts=c("max", "min", "weighted.mean", "sd", "median") #default functs=c("max", "min", "weighted.mean", "sd", "median")
-    xbyusc <- agg2admins(xprepared, data2ag = x2agg, filenm4gdx = paste0(parname,"_uscie_stats"),vbles = xvbles,functs=xfuncts, na.rm=TRUE)
-    save(xbyusc, file=paste0(xn,"_uscie_nuts.rdata"))
-    save(xbyhsu, file=paste0(xn,"_hsu_nuts.rdata"))
-    return(xbyhsu)
-}
 
 
 #### FOREST SHARE ####
-#gdxInfo("forestshare.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
 #This dataset contains forest share data at USCIE level
-xfulln<-paste0(capridat,"forestshare.gdx")
-processdata(xfulln)
-# adf <- as.data.table(rgdx.param(paste0(capridat,"forestshare.gdx"),"p_forshares")) #load of gdx linking forest shares and USCIE numbers, dataset coming from capri/dat/capdis/hsu2
-# names(adf) <- c("s_uscierc","s_years","value")
-# x <- dcast.data.table(adf, s_uscierc ~ s_years, drop=TRUE, value.var="value")  #to split the years in two columns containing forshare info
-# forshare <- processdata(x,xn="p_forestshare",old = c("2000","2006"), new = c("f_2000", "f_2006"))
+xresult<-processdata(paste0(capridat,"forestshare.gdx"))
 
+            
 
 
 #### DIGITAL ELEVATION MODEL ####
