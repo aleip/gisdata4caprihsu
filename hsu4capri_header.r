@@ -205,14 +205,14 @@ processdata<-function(xfulln,oldn=NULL,newn=NULL,spatunit="s_uscierc",parn=NULL)
     names(xloaded)[dim+1]<-"mean"
     
     functs=c("max", "min", "mean", "sd", "median")
-    if(spatunit=="s_uscierc"){xhsu<-agguscie2hsu(xloaded,xfrom=spatunit,xto="hsu",xvbles = "mean",dim=dim,functs=functs)}else{xstart<-xloaded}
+    if(spatunit=="s_uscierc"){xhsu<-agguscie2hsu(xloaded,xfrom=spatunit,xto="hsu",xvbles = "mean",dim=dim,functs=functs)}else{xhsu<-xloaded}
     
     unittoagg<-"hsu"
     if(unittoagg=="hsu"){
-    xstart <- preparedata(xhsu)
-    xstart<-xstart[!is.na(xstart$mean)]
+        xstart <- preparedata(xhsu)
+        xstart<-xstart[!is.na(xstart$mean)]
     #xstatistics <- computestatistics(xstart)
-    }else ifif(unittoagg=="uscie"){
+    }else if(unittoagg=="uscie"){
         xstart <- preparedata(xloaded)
         xstart<-xstart[!is.na(xstart$mean)]
         #xstatistics <- computestatistics(xstart)
