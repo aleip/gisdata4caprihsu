@@ -176,73 +176,101 @@ wgdx.lst("centroids_spatialunit", c(lst, lst1, lst2))
 
 
 
+
+
+
 #### FOREST SHARE ####
+#memory.limit(size = 2048000)
 #This dataset contains forest share data at USCIE level
 xresult<-processdata(paste0(capridat,"forestshare.gdx"))
 
-            
 
 
 #### DIGITAL ELEVATION MODEL ####
 
-
 #gdxInfo("uscie_dem.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
 #This dataset contains forest share data at USCIE level
-uscie_dem <- rgdx.param("uscie_dem.gdx","p_uscierc_dem") #load gdx file linking uscie and dem, dataset coming from capri/dat/capdis/uscie
-colnames(uscie_dem)[1] <- "s_uscierc"
-colnames(uscie_dem)[3] <- "variables" 
-uscie_dem2 <- dcast(uscie_dem, s_uscierc ~ variables, drop=TRUE, value.var="value")  #to split the variables in the data set (altitude_m, slope_perc) in two different columns 
-
-## Running Function 3: Preparing data set to run function 1
-
-dem <- preparedata(uscie_dem2)
-
-### Running Function1: 
-
-# Statistics can be computed aggregating data either by USCIE or by HSU2
-# By USCIE
-dem_uscie_nuts <- agg2admins(dem, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("altitude_m", "slope_perc"), filenm4gdx = "dem_uscie_stats", na.rm=TRUE)
-
-# By HSU2
-dem_hsu_nuts <- agg2admins(dem, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("altitude_m", "slope_perc"), filenm4gdx = "dem_hsu_stats", na.rm=TRUE)
+xresult<-processdata(paste0(capridat,"uscie_dem.gdx"))
+# xavi: I'm not sure about the spatial units here
 
 
-save(dem_uscie_nuts, file="dem_uscie_nuts.rdata")
-#load(file = "dem_uscie_nuts.rdata")
-save(dem_hsu_nuts, file="dem_hsu_nuts.rdata")
-remove(dem_uscie_nuts)
-remove(dem_hsu_nuts)
-remove(uscie_dem, uscie_dem2, dem)
+#### IRRISHARE ####
 
+#gdxInfo("uscie_irrishare.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
+#This dataset contains irrigation data at USCIE level.
 
-
-
+xresult<-processdata(paste0(capridat,"uscie_irrishare.gdx"))
 
 
 #### SOIL ####
 
 #gdxInfo("soil_hwsd.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
 #This dataset contains soil data at HSU2 level.
-adf_soil <- rgdx.param("soil_hwsd.gdx", "p_soildom")  #load of gdx linking soil properties and hsu, dataset coming from capri/dat/capdis/hsu2
-names(adf_soil) <- c("hsu", "variables", "value")
-hsu2_soil <- dcast(adf_soil, hsu ~ variables, drop=TRUE, value.var="value")  #to split the variables in columns containing soil info
 
-## Running Function 3: Preparing data set to run function 1
-
-soil <- preparedata(hsu2_soil)
-
-
-### Running Function1: 
-# xavi: I couldn't find soil data at uscie level, so it only can be computed aggregating data at HSU level
-
-vrbles <- names(hsu2_soil)[-1]
-soil_hsu_nuts2 <- agg2admins(soil, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = vrbles, filenm4gdx = "soil_hsu_stats", na.rm=TRUE)
-
-
-save(soil_hsu_nuts2, file="soil_hsu_nuts2.rdata")
+xresult<-processdata(paste0(capridat,"soil_hwsd.gdx"), spatunit="hsu", parn = "p_soildom")
 
 
 
+
+
+
+#### WET DEPOSITION FOR OXN, RDN, and SOX ####
+
+
+#deposition<-function(depfile,deptype,tser){
+#  #depfile: Deposition file including path in csv format
+#  #deptype: Column-header of deposition values (year-independent part)
+#  #tser: Years for which deposition data are avaialble (part of column header)
+#  dep<-fread(depfile,header=TRUE,select=c("USCIE_RC","i50_j50","HSU2_IDRUN","LAND_SEA",paste0(deptype,tser)))
+#  setkey(dep,USCIE_RC) # to set a key column of the DataTable
+#  setnames(dep, old=c("USCIE_RC", "i50_j50"), new=c("s_uscierc", "emepgrid"))
+#  #names(dep)[1] <- "s_uscierc"
+#  return(dep)
+#}
+#tser<-c("06","07","08","09","10")
+#dep<-deposition(paste0(usciedatapath,"USCIE_EMEP_HSU2_CTRY_WDEP_OXN.csv"),deptype="WDON",tser=tser)
+#dep<-deposition(paste0("test.csv"),deptype="WDON",tser=tser)
+#xavi: what is category 3 of LAND_SEA col? I guess 1 is land and 2 is sea
+
+
+
+# WET DEPOSITION FOR OXN
+
+# xavi: Instead of passing "tser" and "deptype", now it has to be passed the names of the columns ("varbles").
+#       The former function "deposition" now is included in "loadcsv"
+xresult<-processdata(paste0(capridat,"USCIE_EMEP_HSU2_CTRY_WDEP_OXN.csv"), spatunit="emepgrid", varbles=c("WDON06", "WDON07", "WDON08", "WDON09", "WDON10"))
+
+# WET DEPOSITION FOR RDN
+#wdep.rdn <- fread("USCIE_EMEP_HSU2_CTRY_WDEP_RDN.csv") #load csv file linking uscie and RDN wet deposition, dataset coming from capri/dat/capdis/uscie
+
+# WET DEPOSITION FOR SOX
+#wdep.sox <- fread("USCIE_EMEP_HSU2_CTRY_WDEP_SOX.csv") #load csv file linking uscie and SOX wet deposition, dataset coming from capri/dat/capdis/uscie
+
+
+
+
+#### DRY DEPOSITION FOR OXN, RDN, and SOX ####
+
+# DRY DEPOSITION FOR SOX
+
+xresult<-processdata(paste0(capridat,"USCIE_EMEP_LC_HSU2_CTRY_DDEP_SOX.csv"), spatunit="emepgrid", varbles=c("DDOS06", "DDOS07", "DDOS08", "DDOS09", "DDOS10"))
+
+
+
+
+
+
+
+
+
+#### METEO ####
+
+##Meteo per month
+xresult<-processdata(paste0(capridat,"marsmeteo.gdx"), spatunit="marsgrid", parn = "p_marsmeteomonths", sets = c("i1", "i3", "i4", "value"))
+
+##Meteo per year/quartals
+xresult<-processdata(paste0(capridat,"marsmeteo.gdx"), spatunit="marsgrid")
+#, sets = c("i1", "i3", "i4", "value")
 
 
 
@@ -292,35 +320,6 @@ yield_smth_hsu2_nuts <- agg2admins(yield_smth_hsu, data2ag = c("hsu"), functs = 
 
 
 
-
-
-#### IRRISHARE ####
-
-
-
-#gdxInfo("uscie_irrishare.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
-#This dataset contains irrigation data at USCIE level.
-uscie_irr <- rgdx.param("uscie_irrishare.gdx", "irr_share2000")  #load of gdx linking irrigation data and hsu, dataset coming from capri/dat/capdis/hsu2
-names(uscie_irr) <- c("s_uscierc", "irr")
-#No need to dcast because there is only one variable
-
-## Running Function 3: Preparing data set to run function 1
-
-irrishare <- preparedata(uscie_irr)
-
-
-### Running Function1: 
-
-irr_uscie_nuts <- agg2admins(irrishare, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = "irr", filenm4gdx = "irrishare_uscie_stats", na.rm=TRUE)
-
-# By HSU
-irr_hsu_nuts <- func1(irrishare, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = "irr", filenm4gdx = "irrishare_hsu_stats", na.rm=TRUE)
-
-
-save(irr_uscie_nuts, file="irr_uscie_nuts.rdata")
-save(irr_hsu_nuts, file="irr_hsu_nuts.rdata")
-
-rm(uscie_irr, irrishare, irr_uscie_nuts, irr_hsu_nuts)
 
 
 
@@ -538,116 +537,6 @@ ciao <- na.omit(meteo.trimester.hsu.nuts)
 attr(ciao,"symName") <- "p_marsmeteo"
 lst <- wgdx.reshape(ciao,symDim,tName = "data")
 wgdx.lst("marsmeteo.trimester.hsu.nuts.gdx",lst)
-
-
-
-#### WET DEPOSITION FOR OXN, RDN, and SOX ####
-
-#memory.limit(size = 2048000)
-
-# WET DEPOSITION FOR OXN
-deposition<-function(depfile,deptype,tser){
-    #depfile: Deposition file including path in csv format
-    #deptype: Column-header of deposition values (year-independent part)
-    #tser: Years for which deposition data are avaialble (part of column header)
-    dep<-fread(depfile,header=TRUE,select=c("USCIE_RC","i50_j50","HSU2_IDRUN","LAND_SEA",paste0(deptype,tser)))
-    setkey(dep,USCIE_RC) # to set a key column of the DataTable
-    names(dep)[1] <- "s_uscierc"
-    return(dep)
-}
-tser<-c("06","07","08","09","10")
-dep<-deposition(paste0(usciedatapath,"USCIE_EMEP_HSU2_CTRY_WDEP_OXN.csv"),deptype="WDON",tser=tser)
-dep<-deposition(paste0("test.csv"),deptype="WDON",tser=tser)
-
-wdep_oxn_uscie <- wdep.oxn[, c(1, 7:11), with=FALSE]
-remove(wdep.oxn)
-#No need to dcast, it's already in "wide form"
-# Running Function 3: Preparing data set to run function 1
-wdep_oxn <- func3(wdep_oxn_uscie)
-remove(wdep_oxn_uscie)
-# Running Function1: 
-# Statistics can be computed aggregating data either by USCIE or by HSU2
-# By USCIE
-wdep_oxn_uscie_nuts <- agg2admins(wdep_oxn, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("WDON06", "WDON07", "WDON08", "WDON09", "WDON10"), filenm4gdx = "wdep_oxn_uscie_stats", na.rm=TRUE)
-
-# By HSU2
-wdep_oxn_hsu_nuts <- agg2admins(wdep_oxn, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("WDON06", "WDON07", "WDON08", "WDON09", "WDON10"), filenm4gdx = "wdep_oxn_hsu_stats", na.rm=TRUE)
-save(wdep_oxn_uscie_nuts, file="wdep_oxn_uscie_nuts.rdata")
-save(wdep_oxn_hsu_nuts, file="wdep_oxn_hsu_nuts.rdata")
-
-#remove(wdep_oxn)
-remove(wdep_oxn_uscie_nuts)
-remove(wdep_oxn_hsu_nuts)
-gc()
-
-# WET DEPOSITION FOR RDN
-wdep.rdn <- fread("USCIE_EMEP_HSU2_CTRY_WDEP_RDN.csv") #load csv file linking uscie and RDN wet deposition, dataset coming from capri/dat/capdis/uscie
-setkey(wdep.rdn, "USCIE_RC") # to set a key column of the DataTable
-wdep_rdn_uscie <- wdep.rdn[, c(1, 7:11), with=FALSE]
-names(wdep_rdn_uscie)[1] <- "s_uscierc"
-remove(wdep.rdn)
-gc()
-#No need to dcast, it's already in "wide form"
-# Running Function 3: Preparing data set to run function 1
-wdep_rdn <- func3(wdep_rdn_uscie)
-remove(wdep_rdn_uscie)
-gc()
-# Running Function1: 
-# Statistics can be computed aggregating data either by USCIE or by HSU2
-# By USCIE
-wdep_rdn_uscie_nuts <- agg2admins(wdep_rdn, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("WDRN06", "WDRN07", "WDRN08", "WDRN09", "WDRN10"), filenm4gdx = "wdep_rdn_uscie_stats", na.rm=TRUE)
-# By HSU2
-wdep_rdn_hsu_nuts <- agg2admins(wdep_rdn, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("WDRN06", "WDRN07", "WDRN08", "WDRN09", "WDRN10"), filenm4gdx = "wdep_rdn_hsu_stats", na.rm=TRUE)
-save(wdep_rdn_uscie_nuts, file="wdep_rdn_uscie_nuts.rdata")
-save(wdep_rdn_hsu_nuts, file="wdep_rdn_hsu_nuts.rdata")
-
-#remove(wdep_rdn)
-remove(wdep_rdn_uscie_nuts)
-remove(wdep_rdn_hsu_nuts)
-gc()
-
-
-
-
-
-# WET DEPOSITION FOR SOX
-
-wdep.sox <- fread("USCIE_EMEP_HSU2_CTRY_WDEP_SOX.csv") #load csv file linking uscie and SOX wet deposition, dataset coming from capri/dat/capdis/uscie
-setkey(wdep.sox, "USCIE_RC") # to set a key column of the DataTable
-
-wdep_sox_uscie <- wdep.sox[, c(1, 7:11), with=FALSE]
-names(wdep_sox_uscie)[1] <- "s_uscierc"
-remove(wdep.sox)
-gc()
-#No need to dcast, it's already in "wide form"
-
-# Running Function 3: Preparing data set to run function 1
-
-wdep_sox <- func3(wdep_sox_uscie)
-remove(wdep_sox_uscie)
-gc()
-
-# Running Function1: 
-
-# Statistics can be computed aggregating data either by USCIE or by HSU2
-# By USCIE
-wdep_sox_uscie_nuts <- agg2admins(wdep_sox, data2ag = c("uscie"), functs = c("max", "min", "mean", "sd", "median"), vbles = c("WDOS06", "WDOS07", "WDOS08", "WDOS09", "WDOS10"), filenm4gdx = "wdep_sox_uscie_stats", na.rm=TRUE)
-# By HSU2
-wdep_sox_hsu_nuts <- agg2admins(wdep_sox, data2ag = c("hsu"), functs = c("max", "min", "weighted.mean", "sd", "median"), vbles = c("WDOS06", "WDOS07", "WDOS08", "WDOS09", "WDOS10"), filenm4gdx = "wdep_sox_hsu_stats", na.rm=TRUE)
-
-
-save(wdep_sox_uscie_nuts, file="wdep_sox_uscie_nuts.rdata")
-save(wdep_sox_hsu_nuts, file="wdep_sox_hsu_nuts.rdata")
-
-remove(wdep_sox)
-remove(wdep_sox_uscie_nuts)
-remove(wdep_sox_hsu_nuts)
-gc()
-
-
-
-
-
 
 
 

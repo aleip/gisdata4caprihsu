@@ -22,7 +22,7 @@ if(Sys.info()[4]=="L01RI1203587"){ #checks machine name
     workpath<-"x:/adrian/tools/rprojects/gisdata4caprihsu/"
     capridat<-"x:/adrian/models/capri/trunk20160810/dat/capdis/hsu2/"
 }else{
-    workpath<-"X:/MARS_disaggregation/hsu2_statistics_xavi/"
+    workpath<-"X:/MARS_disaggregation/hsu2_statistics_xavi2/"
     usciedatapath<-workpath
     capridat<-workpath
     gamspath<-"X:/GAMS/win64/24.7"
@@ -34,157 +34,239 @@ setwd(workpath)
 #link with gams directory
 igdx(gamspath)
 
-## Function 1: Computing statistics per HSU, NUTS 3-2-0.
-# 
-# NOTES FOR THIS FUNCTION: 
-# The first argument (x) is the data table
-# data2ag is to define if you want to aggregate data by uscie or hsu
-# Pass the functions (statistics) to be computed as arguments (e.g. functs = c("weighted.mean", "max"))
-# Pass the variables to compute (e.g. vbles = c("f_2000", "f_2006"))
-# If desired, provide na.rm = TRUE
-# If weighted mean wants to be computed, in the data table must be one column called "area". If it is not provided, an error message is issued and the function stops
-# filenm4gdx is to define the filename for the exported gdx
 
-agguscie2hsu<-function(x2agg,xfrom,xto,xvbles,dim,functs){
-    
-    print(paste0("Computing statistics from ",xfrom," to ",xto,"!"))
-    
-    #For weighted mean return the weighting column (area) otherwise leave functs unchanged
-    for (i in 1:length(functs)){   # this loop is to add the argument "area", nedded to compute weighted mean
-        if (functs[i] == "weighted.mean"){      # this is to tell the function how to compute weighted mean
-            functs[i] <- "weighted.mean(., fraction)"   
-            if(!"area" %in% colnames(x2agg)) stop("please, provide a column called 'area' with areas", call. = FALSE)   # If a column called "area" with areas is not provided, an error message is issued and the function stops
-        } else {
-            functs[i] <- functs[i]
-        }
+agguscie2hsu<-function(x2agg,xfrom,xto,xvbles,dim,functs, varbles){
+  
+  
+  #For weighted mean return the weighting column (area) otherwise leave functs unchanged
+  for (i in 1:length(functs)){   # this loop is to add the argument "area", nedded to compute weighted mean
+    if (functs[i] == "weighted.mean(., area)"){      # this is to tell the function how to compute weighted mean
+      if(!"area" %in% colnames(x2agg)) stop("please, provide a column called 'area' with areas", call. = FALSE)   # If a column called "area" with areas is not provided, an error message is issued and the function stops
     }
-
-    x2agg$i<-as.numeric(as.character(x2agg$i))
-    setkey(x2agg,i)
-    setnames(x2agg,old="i",new=xfrom)
-    if(xfrom=="s_uscierc"){
-        setkey(uscie_hsu,s_uscierc)
-        xhsu<-x2agg[uscie_hsu]
-        x2agg<-xhsu[complete.cases(xhsu)]
-        setnames(x2agg,old="hsu",new="xto")
-    }else if(xfrom=="marsgrid"){
-        #to adapt for 'marsgrid' 
-        #not yet checked, needs 
-        #(1) joint with marsgrid_hsu over the hsu and 
-        #(2) calculate weighted mean with area as weight 
-        #(fraction not needed - area gives the area in the HSU in the different grids)
-        setkey(marsgrid_hsu,marsgrid)
-        xhsu<-x2agg[marsgrid_hsu]
-        # take into account fractions in each HSU of differnt grid cell
-        #x2agg<-xhsu[complete.cases(xhsu)]
-        #setnames(x2agg,old="hsu",new="xto")
-    }else if(xfrom=="emepgrid"){
-        #to adapt for 'emepgrid' 
-        #not yet checked, needs 
-        #(1) joint with emepgrid_hsu over the hsu and 
-        #(2) calculate weighted mean with area as weight 
-        #(area gives the area in the HSU in the different grids)
-        setkey(marsgrid_hsu,marsgrid)
-        xhsu<-x2agg[marsgrid_hsu]
-        # take into account fractions in each HSU of differnt grid cell
-        #x2agg<-xhsu[complete.cases(xhsu)]
-        #setnames(x2agg,old="hsu",new="xto")
-    }else{
-        setnames(x2agg,old=xto,new="xto")
+  }
+  
+  x2agg$i<-as.numeric(as.character(x2agg$i))
+  setkey(x2agg,i)
+  setnames(x2agg,old="i",new=xfrom)
+  
+  if(xfrom=="s_uscierc"){
+    print(paste0("Linking ", xfrom, " data with ", xto))
+    #setkey(uscie_hsu,s_uscierc) # xavi: this is already done
+    xhsu<-x2agg[uscie_hsu]   # merge HSU (left join)
+    x2agg<-xhsu[complete.cases(xhsu)] 
+    setnames(x2agg,old="hsu",new="xto")
+    
+    
+  }else if(xfrom=="marsgrid"){
+    print(paste0("Linking ", xfrom, " data with ", xto))
+    setkey(marsgrid_hsu, marsgrid)
+    xhsu<-x2agg[marsgrid_hsu, allow.cartesian=TRUE]
+    if(dim==3){
+      x2agg <- xhsu[,.(value =  weighted.mean(mean, fraction)), by=.(hsu, j, k)]  #xavi: this step takes a bit long
+    }else{  #xavi: for now, always dim is 2 or 3
+      x2agg <- xhsu[,.(value =  weighted.mean(mean, fraction)), by=.(hsu, j)]
     }
-    if(dim==2){
-        xres<-as.data.table(summarise_at(group_by(x2agg,j,xto),xvbles, functs, na.rm=TRUE))
-        #xres<-as.data.table(summarise_at(group_by(xhsu2,j,hsu),xvbles, functs, na.rm=TRUE))
+    setnames(x2agg, old=c(xto, "value"), new=c("xto", "mean"))
+    
+    
+  }else if(xfrom=="emepgrid"){
+    print(paste0("Linking ", xfrom, " data with ", xto))  
+    
+    if(any(grepl("WD", varbles)==TRUE)){   #This is for Wet Deporition
+      
+      dep_unique <- unique(x2agg, by="i50_j50")
+      longDT <- melt(dep_unique,
+                     id.vars = "i50_j50",
+                     measure.vars = varbles,
+                     variable.name = "j",
+                     value.name = "value")
+      setkey(longDT, i50_j50) # to set a key column of the DataTable
+      setkey(hsu2_emepgrid_area, i50_j50)
+      emep_hsu<-longDT[hsu2_emepgrid_area, allow.cartesian=TRUE]   # merge HSU (left join)
+      x2agg <- emep_hsu[,.(value =  weighted.mean(value, frac_emep_hsu)), by=.(hsu, j)]
+      
+    }else if(any(grepl("DD", varbles)==TRUE)){  #This is for Dry deposition
+      dep_unique <- unique(x2agg, by=c("i50_j50", "EMEP_LC_CLASS"))
+      longDT <- melt(dep_unique,
+                     id.vars = c("i50_j50", "EMEP_LC_CLASS"),
+                     measure.vars = varbles,
+                     variable.name = "j",
+                     value.name = "value")
+      setkey(longDT, i50_j50) # to set a key column of the DataTable
+      setkey(hsu2_emepgrid_lc_area, i50_j50)
+      emep_hsu <- merge(longDT, hsu2_emepgrid_lc_area, by = c("i50_j50", "EMEP_LC_CLASS"), allow.cartesian=TRUE)
+      x2agg <- emep_hsu[,.(value =  weighted.mean(value, frac_emep_lu_hsu)), by=.(hsu, j)]
+    }
+    setnames(x2agg, old=c("hsu", "value"), new=c("xto", "mean"))
+    setkey(x2agg, xto)
+    
+    
+  }else{   #(if xfrom==hsu)
+    #setnames(x2agg,old="hsu",new="xto")
+    #print(paste0("Computing statistics from ", xfrom, " to ", xto, "!"))
+  }
+  
+  
+  
+  if(xfrom=="s_uscierc" | xfrom=="hsu"){
+    if(xfrom=="hsu") setnames(x2agg,old=xto,new="xto")
+    
+    print(paste0("Computing statistics from ", xfrom, " to ", xto, "!"))
+    
+    if(dim==1){
+      xres<-as.data.table(summarise_at(group_by(x2agg,xto),xvbles, functs, na.rm=TRUE))
+      
+    }else if(dim==2){
+      xres<-as.data.table(summarise_at(group_by(x2agg,j,xto),xvbles, functs, na.rm=TRUE))
+      #xres<-as.data.table(summarise_at(group_by(xhsu2,j,hsu),xvbles, functs, na.rm=TRUE))
+      
     }else if(dim==3){
-        xres<-as.data.table(summarise_at(group_by(xhsu2,j,k,xto),xvbles, functs, na.rm=TRUE))
+      xres<-as.data.table(summarise_at(group_by(x2agg,j,k,xto),xvbles, functs, na.rm=TRUE))
+      
     }else{
-        stop("Function aggs_uscierc2hsu not yet set-up for more than 3 dimensions")
+      stop("Function aggs_uscierc2hsu not yet set-up for more than 3 dimensions")
     }
-    for (jjj in (dim+1):ncol(xres)) set(xres,which(is.na(xres[[jjj]])),jjj,0)
-    setkey(xres,xto)
-    setnames(xres,new="i",old="xto")
-    xresn<-c(letters[9:(9+dim-1)])
-    xresn<-c(xresn,colnames(xres)[!colnames(xres)%in%xresn])
-    xres<-xres[,xresn,with=FALSE]
-    colnames(xres)<-gsub("weighted.mean","mean",colnames(xres))
-    #hsu-colname required for preparedata
-    if(xfrom=="s_uscierc")setnames(xres,old="i",new="hsu")
-    return(xres)  
-}
+    
+  }else{
+    
+    xres <- x2agg
+    
+  }
+  
+  
+  for (jjj in (dim+1):ncol(xres)) set(xres,which(is.na(xres[[jjj]])),jjj,0)
+  setkey(xres,xto)
+  setnames(xres,new="i",old="xto")
+  xresn<-c(letters[9:(9+dim-1)])
+  xresn<-c(xresn,colnames(xres)[!colnames(xres)%in%xresn])
+  xres<-xres[,xresn,with=FALSE]
+  colnames(xres)<-gsub("weighted.mean","mean",colnames(xres))
+  #hsu-colname required for preparedata
+  if(xfrom=="s_uscierc" | xfrom=="emepgrid" | xfrom=="marsgrid") setnames(xres,old="i",new="hsu")
+  return(xres)  
+  
+} #end of agguscie2hsu
+
+
+
 
 preparedata <- function(xstart){
+  
+  print("Adding NUTS info...")
+  if(any(grepl("hsu", names(xstart))==TRUE)){  #to add hsu areas and NUTS data
     
-    print("Running function 3...")
-    nmt <- deparse(substitute(x)) # To capture the name of x as charactre (but as it is ALWAYS x this is not required?)
+    #setnames(xstart,old="i",new="hsu")
+    xstart$hsu <- as.numeric(as.character(xstart$hsu))
+    setkey(xstart, hsu) # to set a key column
+    hsu2_nuts$hsu <- as.numeric(as.character(hsu2_nuts$hsu))
+    setkey(hsu2_nuts, hsu) # to set a key column
+    x3<-xstart[hsu2_nuts]
+    x3<-x3[!is.na(hsu)]
+    setkey(x3, hsu) # to set a key column
+    setnames(x3,new="i",old="hsu")
     
-    # This is not needed - we do not have to link each uscie to all other units, as results need to be at hsu-level
-    # if(any(grepl("s_uscierc", names(x))==TRUE)){  #to add HSU, their areas, and NUTS data
-    #     
-    #     print(paste0("Relating ", nmt, " with HSU2 and NUTS codes"))  
-    #     
-    #     x$s_uscierc <- as.numeric(as.character(x$s_uscierc)) # to transform the column to numeric
-    #     x2 <- as.data.table(x) # to transform x to a DataTable
-    #     setkeyv(x2, "s_uscierc") # to set a key column
-    #     
-    #     
-    #     usciehsu_x2 <- merge(x2, uscie_hsu, by="s_uscierc", all.x=TRUE) #to join of old gdx file with new hsu. Type of joining "left"
-    #     gc()
-    #     #xavi: this is not necessary #usciehsu_x2$s_uscierc <- factor(usciehsu_x2$s_uscierc) # to transform the column to factor
-    #     usciehsu_x2$hsu <- factor(usciehsu_x2$hsu) # to transform the column to factor
-    #     #xavi: previous line is necessary to do the merge
-    #     setkey(usciehsu_x2, "hsu") # to set a key column
-    #     
-    #     x3 <- merge(usciehsu_x2, hsu2_nuts, by.y="hsu", by.x="hsu", all.x=TRUE)
-    #     
-    #     
-    # }else 
-    if(any(grepl("hsu", names(xstart))==TRUE)){  #to add hsu areas and NUTS data
-        
-        print(paste0("Relating ", nmt, " with NUTS codes"))  
-        #setnames(xstart,old="i",new="hsu")
-        setkeyv(xstart, "hsu") # to set a key column
-        setkeyv(hsu2_nuts, "hsu") # to set a key column
-        x3<-xstart[hsu2_nuts]
-        x3<-x3[!is.na(hsu)]
-        setkeyv(x3, "hsu") # to set a key column
-        setnames(x3,new="i",old="hsu")
-        
-    }else if(any(grepl("grid", names(xstart))==TRUE)){  #to add HSU2 and NUTS codes, and hsu2 areas
-        
-        print(paste0("Relating ", nmt, " with HSU and NUTS codes"))
-        
-        
-        
-    }else{
-        
-        print("Unknown spatial units of the data")
-        print("You can choose 's_uscierc', 'hsu' or 'grid' as column name")
-    }
-    return(x3)
+    #}else if(any(grepl("grid", names(xstart))==TRUE)){  #to add HSU2 and NUTS codes, and hsu2 areas
+    
+    #   print(paste0("Relating ", nmt, " with HSU and NUTS codes"))
+    
+  }else{
+    stop("Unknown spatial units of the data, It should be 'hsu'")
+  }
+  
+  return(x3)
 } #End of func3
 
-loadgdxfile<-function(xfulln,parname=NULL){
-    pars<-as.data.table(gdxInfo(xfulln,dump=FALSE,returnList=FALSE,returnDF=TRUE)$parameters$name)
-    dims<-as.data.table(gdxInfo(xfulln,dump=FALSE,returnList=FALSE,returnDF=TRUE)$parameters$dim)
-    if(is.null(parname)){
-        if(length(pars)>1){
-            stop(paste("Data file contains several parameter, please indicate which ",pars,collapse="-"))
-        }else if (length(pars)==0){
-            stop(paste("Data file contains no parameter"))
-        }else{
-            parname<-as.character(pars)
-            dim<-as.numeric(dims)
-        }
-    }else{
-        dim<-as.numeric(dims[pars$V1==parname])
-    }
-    #rgdx returns i,j,... for each dim and writes the values into the column 'value'
-    gdxl<-c("j","k","l","m")
-    x <- as.data.table(rgdx.param(xfulln,parname))
-    return(list(x,dim,parname))
-}
 
-processdata<-function(xfulln,oldn=NULL,newn=NULL,spatunit="s_uscierc",parn=NULL){
+
+loadgdxfile<-function(xfulln, parname=NULL, sets=NULL){
+  pars<-as.data.table(gdxInfo(xfulln,dump=FALSE,returnList=FALSE,returnDF=TRUE)$parameters$name)
+  dims<-as.data.table(gdxInfo(xfulln,dump=FALSE,returnList=FALSE,returnDF=TRUE)$parameters$dim)
+  
+  if(is.null(parname)){
+    if(nrow(pars)>1){  #xavi: because it's a dataTable
+      stop(paste("Data file contains several parameter, please indicate which: ", paste(pars$V1, collapse=" - ")))
+    }else if (nrow(pars)==0){
+      stop(paste("Data file contains no parameter"))
+    }else{
+      parname<-as.character(pars)
+      dim<-as.numeric(dims)
+    }
+  }else{
+    dim<-as.numeric(dims[pars$V1==parname])
+    
+  }
+  #
+  
+  if(dim<4){
+    #rgdx returns i,j,... for each dim and writes the values into the column 'value'
+    gdxl<-c("j","k","l","m") #xavi: for what is this?
+    x <- as.data.table(rgdx.param(xfulln,parname))
+    
+  }else if(dim>3 && is.null(sets)){
+    
+    x <- as.data.table(rgdx.param(xfulln,parname))
+    print(head(x))
+    print(paste0("num of dims = ", dim))
+    print(paste0("parameter name = ", parname))
+    stop("More than 3 dimensions, please choose which columns to be included (e.g. sets=c('i1'...))")
+    
+  }else if(dim>3 && !is.null(sets)){
+    
+    x <- as.data.table(rgdx.param(xfulln,parname))
+    #x <- x[, .(sets)]
+    x <- subset(x, select=sets)
+    dim <- length(sets) - 1
+  }
+  
+  return(list(x,dim,parname))
+  
+} #End of loadgdxfile
+
+
+
+#loadcsv<-function(xfulln, spatunit="s_uscierc", varbls){
+#  
+#  csvfile<-fread(xfulln, header=TRUE)
+#  #setkey(csvfile, s_uscierc) # to set a key column of the DataTable
+#  # xavi: if Doing Melt here, not possible to join later with hsu-emep
+#  longDT <- melt(csvfile,
+#                 id.vars = spatunit,
+#                 measure.vars = varbls,
+#                 variable.name = "j",
+#                 value.name = "mean")
+#  return(longDT)
+#  
+#}# End of loadcsv
+
+
+
+
+loadcsv<-function(xfulln, varbles){
+  
+  if(any(grepl("WD", varbles)==TRUE)){   #This is for Wet Deporition
+    
+    dep<-fread(xfulln, header=TRUE, select=c("i50_j50", varbles))
+    setkey(dep,i50_j50) # to set a key column of the DataTable
+    
+  }else if(any(grepl("DD", varbles)==TRUE)){  #This is for Dry deposition
+    dep<-fread(xfulln, header=TRUE, select=c("i50_j50","EMEP_LC_CLASS", varbles))
+    setkey(dep,i50_j50) # to set a key column of the DataTable
+  }
+  
+  dim <- 2   # for now, this is hardcoded
+  
+  nm <- strsplit(xfulln,"\\.")[[1]]
+  nm <- strsplit(nm[1],"_")[[1]]
+  nm <- tail(nm, 2)[1:2]
+  parname <- paste(nm, collapse = "_")
+  
+  return(list(dep, dim, parname))
+  
+}# End of loadcsv
+
+
+
+processdata<-function(xfulln,oldn=NULL,newn=NULL,spatunit="s_uscierc",parn=NULL,functs=c("max", "min", "mean", "sd", "median"), varbles=NULL, sets=NULL){
     #x: data table that contains one row with the original unit and further rows with variables of the name 'newn'
     #xn: part of the file names to be generated
     #oldn: variable names as in original data
@@ -194,366 +276,254 @@ processdata<-function(xfulln,oldn=NULL,newn=NULL,spatunit="s_uscierc",parn=NULL)
     fileext<-fileext[length(fileext)]
     
     if(fileext=="gdx"){
-        # Load gdx-file (no other load-function has been develoed yet...)
-        x<-loadgdxfile(xfulln,parname=parn)
-        dim<-x[[2]]
-        parn<-x[[3]]
-        xloaded<-x[[1]]
+      # Load gdx-file (no other load-function has been develoed yet...)
+      print("Loading gdx file...")
+      x<-loadgdxfile(xfulln, parname=parn, sets=sets)
+      dim<-x[[2]]
+      parn<-x[[3]]
+      xloaded<-x[[1]]
+      names(xloaded)[dim+1]<-"mean"
+      if(dim==3){
+        names(xloaded)[1] <- "i"
+        names(xloaded)[3] <- "j"
+        names(xloaded)[2] <- "k" 
+      }
+      
+    }else if(fileext=="csv"){
+      print("Loading csv file...")
+      x <- loadcsv(xfulln, varbles)
+      dim<-x[[2]]
+      parn<-x[[3]]
+      xloaded<-x[[1]]
+      
+        
     }else{
         stop(paste0("No loading procedure for files with extension ",fileext," has been developed yet..."))
     }
-    names(xloaded)[dim+1]<-"mean"
     
-    functs=c("max", "min", "mean", "sd", "median")
-    if(spatunit=="s_uscierc"){xhsu<-agguscie2hsu(xloaded,xfrom=spatunit,xto="hsu",xvbles = "mean",dim=dim,functs=functs)}else{xhsu<-xloaded}
     
-    unittoagg<-"hsu"
+    #functs=c("max", "min", "mean", "sd", "median")
+    
+    if(spatunit=="hsu"){
+      xhsu<-xloaded
+      names(xhsu)[1] <- "hsu"
+      xhsu$hsu <- gsub("U", "", xhsu$hsu)
+
+    }else{  
+      xhsu<-agguscie2hsu(xloaded,xfrom=spatunit,xto="hsu",xvbles = "mean",dim=dim,functs=functs, varbles = varbles)
+      
+    }
+
+    
+    #xavi: don't understand next lines (from 193 to 203)
+    unittoagg<-"hsu"   #xavi: if you define it here, always will be hsu (if...else doesn't make sense)
+    #unittoagg <- spatunit  #xavi: maybe?
     if(unittoagg=="hsu"){
         xstart <- preparedata(xhsu)
         xstart<-xstart[!is.na(xstart$mean)]
-    #xstatistics <- computestatistics(xstart)
+        #xstatistics <- computestatistics(xstart)
     }else if(unittoagg=="uscie"){
         xstart <- preparedata(xloaded)
         xstart<-xstart[!is.na(xstart$mean)]
         #xstatistics <- computestatistics(xstart)
     }
     
+
     
-    functs=c("max", "min", "weighted.mean", "sd", "median")
+    
+    #functs=c("max", "min", "weighted.mean", "sd", "median")
+    
+    #If mean is included in arguments (functs), change it for weighted.mean
+    functs <- replace(functs, functs=="mean", "weighted.mean(., area)")
+    
     xnuts3<-agguscie2hsu(xstart,xfrom="hsu",xto="nuts3","mean",dim=dim,functs=functs)
     xnuts2<-agguscie2hsu(xstart,xfrom="hsu",xto="CAPRI_NUTSII","mean",dim=dim,functs=functs)
     xnuts0<-agguscie2hsu(xstart,xfrom="hsu",xto="CAPRI_NUTS0","mean",dim=dim,functs=functs)
     setnames(xhsu,old="hsu",new="i")
-    xall<-rbind(xnuts0,xnuts2,xnuts3,xhsu)
-    if(!is.null(parn)) setnames(xall,old="j",new=parn)
+
+    if(spatunit=="s_uscierc"){
+      xall<-rbind(xnuts0,xnuts2,xnuts3,xhsu)
+      
+    }else{  
+      xall<-rbind(xnuts0,xnuts2,xnuts3)
+    }
+    
     setnames(xall,old="i",new="spatial_unit")
-    #here call new function to save as gdx
+    if(dim==2) setnames(xall,old="j",new="variables") 
+    if(dim==3) setnames(xall,old=c("j", "k"), new=c("spatial_unit2", "variables"))
+    
+    export2gdx(xall, dim=dim, parn=parn)  # to export to gdx
+    
     save(xnuts0,xnuts2,xnuts3,xhsu, file=paste0(parn,".rdata"))
     return(list(xall,xnuts0,xnuts2,xnuts3,xhsu,xstart))
-}
+} #end of processdata
 
 
-agg2admins <- function(xprepared, 
-                       data2ag="hsu", 
-                       functs=c("max", "min", "weighted.mean", "sd", "median"), 
-                       #functs=c("max", "min", "mean", "sd", "median"), 
-                       vbles, filenm4gdx, ...){
-    
-    start <- Sys.time()
-    
-    # agg<-function(x2agg,aggto,...){
-    #     #print(x2agg[,eval(q)])
-    #     by_hsu <- x2agg %>% group_by(eval(q))
-    #     print(by_hsu)
-    #     xaggd <- by_hsu %>% summarise_at(vbles, functs, ...)
-    #     return(xaggd)
-    # }
-    print("Preparing to compute statistics...")
-    # If original unit is uscie then first aggregate to hsu
-    if(any(grepl("uscie", names(xprepared))==TRUE)){
-        print("Computing statistics per HSU...")
-        by_hsu <- xprepared %>% group_by(hsu)
-        xprepared.hsu <- by_hsu %>% summarise_at(vbles, functs, ...)
-        colnames(xagg)[1] <- "s_spatunit"  #changing 1st column name
-        
-        #HSU values will be the start the overall result
-        xhsu<-as.data.table(xprepared.hsu)
-        
-        
-        if(tolower(data2ag) == "uscie"){
-            xagg<-xprepared
-        }else if(tolower(data2ag) == "hsu"){
-            xagg<-xprepared[,,drop=s_uscierc]
-        }
-    }else if(any(grepl("hsu", names(xprepared))==TRUE)){
-        xprepared.hsu<-xprepared
-        xagg<-xprepared
-    }else{
-        stop("Aggregation should start from either uscie or hsu!")
-    }
-    
-    for (i in 1:length(functs)){   # this loop is to add the argument "area", nedded to compute weighted mean
-        if (functs[i] == "weighted.mean"){      # this is to tell the function how to compute weighted mean
-            functs[i] <- "weighted.mean(., area)"   
-            if(!"area" %in% colnames(xprepared)) stop("please, provide a column called 'area' with areas", call. = FALSE)   # If a column called "area" with areas is not provided, an error message is issued and the function stops
-        } else {
-            functs[i] <- functs[i]
-        }
-    }
-    
-    print("Computing statistics per NUTS III...")
-    by_nuts3 <- xagg %>% group_by(nuts3)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
-    xprepared.nuts3 <- by_nuts3 %>% summarise_at(vbles, functs, ...)
-    colnames(xprepared.nuts3)[1] <- "s_spatunit"  #changing 1st column name
-    
-    print("Computing statistics per CAPRI NUTS II...")
-    by_CAPRI_NUTSII <- xagg %>% group_by(CAPRI_NUTSII)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
-    xprepared.caprinuts <- by_CAPRI_NUTSII %>% summarise_at(vbles, functs, ...)
-    colnames(xprepared.caprinuts)[1] <- "s_spatunit"  #changing 1st column name
-    
-    print("Computing statistics per CAPRI NUTS 0...")
-    by_CAPRI_NUTS0 <- xagg %>% group_by(CAPRI_NUTS0)           #grouping the DataTable before to be passed to the summarise_at(), to be faster
-    xprepared.country <- by_CAPRI_NUTS0 %>% summarise_at(vbles, functs, ...)
-    colnames(xprepared.country)[1] <- "s_spatunit"  #changing 1st column name
-    
-    ## Combining by rows ##
-    print("Creating a table with the results...")
-    xprepared.hsu.nuts2 <- rbind(xprepared.hsu, xprepared.nuts3, xprepared.caprinuts, xprepared.country)
-    if(length(functs)==1 && length(vbles)>1){
-        colnames(xprepared.hsu.nuts2)[-1] <- paste(colnames(xprepared.hsu.nuts2)[-1], functs, sep = "_")
-    }else if(length(functs)>1 && length(vbles)==1){
-        colnames(xprepared.hsu.nuts2)[-1] <- paste(vbles, colnames(xprepared.hsu.nuts2)[-1], sep = "_")
-    }else if(length(functs)==1 && length(vbles)==1){
-        colnames(xprepared.hsu.nuts2)[-1] <- paste(colnames(xprepared.hsu.nuts2)[-1], functs, sep = "_")
-    }
-    return(xprepared.hsu.nuts2)
-}
-# if(tolower(data2ag) == "uscie"){
-#     
-#     # Make sure that there is a USCIE column
-#     if(!any(grepl("uscie", names(xprepared))==TRUE)) stop("There isn't any USCIE column. Are you sure about data2ag=uscie???", call. = FALSE)
-#     
-#     
-#     # Check if a weighted mean is passed, it wouldn't make sense for USCIE data
-#     if(any(functs == "weighted.mean")) stop("It makes no sense to compute weighted mean for USCIE data", call. = FALSE)
-#     
-#     
-#     ## computing statistics per HSU ##
-#     print("Computing statistics per HSU...")
-#     
-#     #  
-#     by_hsu <- xprepared %>% group_by(hsu)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
-#     xprepared.hsu <- by_hsu %>% summarise_at(vbles, functs, ...)    # summarise_at() is a new function included in the new Dev version of dplyr. It will replace the old summarise_each()
-#     
-#     #Do this for saving of gdx-files
-#     colnames(xprepared.hsu)[1] <- "s_spatunit"  #changing 1st column name
-#     xprepared.hsu$s_spatunit <- paste0("U", xprepared.hsu$s_spatunit) #adding "U" in front of spatial units
-#     
-#     
-#     ## Computing statistics per NUTS 3 ##
-#     print("Computing statistics per NUTS III...")
-#     
-#     by_nuts3 <- xprepared %>% group_by(nuts3)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
-#     xprepared.nuts3 <- by_nuts3 %>% summarise_at(vbles, functs, ...)
-#     
-#     colnames(xprepared.nuts3)[1] <- "s_spatunit"  #changing 1st column name
-#     
-#     
-#     ## Computing statistics per CAPRI NUTS II ##
-#     
-#     print("Computing statistics per CAPRI NUTS II...")
-#     
-#     
-#     by_CAPRI_NUTSII <- xprepared %>% group_by(CAPRI_NUTSII)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
-#     xprepared.caprinuts <- by_CAPRI_NUTSII %>% summarise_at(vbles, functs, ...)
-#     
-#     colnames(xprepared.caprinuts)[1] <- "s_spatunit"  #changing 1st column name
-#     
-#     
-#     ## Computing statistics per country (CAPRI NUTS 0) ##
-#     
-#     print("Computing statistics per country (CAPRI NUTS 0...)")
-#     
-#     
-#     by_CAPRI_NUTS0 <- xprepared %>% group_by(CAPRI_NUTS0)           #grouping the DataTable before to be passed to the summarise_at(), to be faster
-#     xprepared.country <- by_CAPRI_NUTS0 %>% summarise_at(vbles, functs, ...)
-#     
-#     colnames(xprepared.country)[1] <- "s_spatunit"  #changing 1st column name
-#     
-#     
-#     ## Combining by rows ##
-#     
-#     print("Creating a table with the results...")
-#     
-#     xprepared.hsu.nuts2 <- rbind(xprepared.hsu, xprepared.nuts3, xprepared.caprinuts, xprepared.country)
-#     
-#     if(length(functs)==1 && length(vbles)>1){
-#         colnames(xprepared.hsu.nuts2)[-1] <- paste(colnames(xprepared.hsu.nuts2)[-1], functs, sep = "_")
-#     }else if(length(functs)>1 && length(vbles)==1){
-#         colnames(xprepared.hsu.nuts2)[-1] <- paste(vbles, colnames(xprepared.hsu.nuts2)[-1], sep = "_")
-#     }else if(length(functs)==1 && length(vbles)==1){
-#         colnames(xprepared.hsu.nuts2)[-1] <- paste(colnames(xprepared.hsu.nuts2)[-1], functs, sep = "_")
-#     }
-#     
-#     
-# }else if(tolower(data2ag) == "hsu"){
-#     
-#     ## Check if a weighted mean is calculated - set the HSMU area as weighting parameter
-#     for (i in 1:length(functs)){   # this loop is to add the argument "area", nedded to compute weighted mean
-#         if (functs[i] == "weighted.mean"){      # this is to tell the function how to compute weighted mean
-#             functs[i] <- "weighted.mean(., area)"   
-#             if(!"area" %in% colnames(xprepared)) stop("please, provide a column called 'area' with areas", call. = FALSE)   # If a column called "area" with areas is not provided, an error message is issued and the function stops
-#         } else {
-#             functs[i] <- functs[i]
-#         }
-#     }
-#     
-#     
-#     ## Computing statistics per NUTS III ##
-#     print("Computing statistics per NUTS III...")
-#     
-#     by_nuts3 <- xprepared %>% group_by(nuts3)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
-#     xprepared.nuts3 <- by_nuts3 %>% summarise_at(vbles, functs, ...)
-#     
-#     colnames(xprepared.nuts3)[1] <- "s_spatunit"  #changing 1st column name
-#     
-#     
-#     ## Computing statistics per CAPRI NUTS II ##
-#     
-#     print("Computing statistics per CAPRI NUTS II...")
-#     
-#     
-#     by_CAPRI_NUTSII <- xprepared %>% group_by(CAPRI_NUTSII)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
-#     xprepared.caprinuts <- by_CAPRI_NUTSII %>% summarise_at(vbles, functs, ...)
-#     
-#     colnames(xprepared.caprinuts)[1] <- "s_spatunit"  #changing 1st column name
-#     
-#     
-#     ## Computing statistics per country (CAPRI NUTS 0) ##
-#     
-#     print("Computing statistics per country (CAPRI NUTS 0...)")
-#     
-#     
-#     by_CAPRI_NUTS0 <- xprepared %>% group_by(CAPRI_NUTS0)           #grouping the DataTable before to be passed to the summarise_at(), to be faster
-#     xprepared.country <- by_CAPRI_NUTS0 %>% summarise_at(vbles, functs, ...)
-#     
-#     colnames(xprepared.country)[1] <- "s_spatunit"  #changing 1st column name
-#     
-#     
-#     ## Combining by rows ##
-#     
-#     print("Creating a table with the results...")
-#     
-#     xprepared.hsu.nuts2 <- rbind(xprepared.nuts3, xprepared.caprinuts, xprepared.country)
-#     
-#     if(length(functs)==1 && length(vbles)>1){
-#         colnames(xprepared.hsu.nuts2)[-1] <- paste(colnames(xprepared.hsu.nuts2)[-1], functs, sep = "_")
-#     }else if(length(functs)>1 && length(vbles)==1){
-#         colnames(xprepared.hsu.nuts2)[-1] <- paste(vbles, colnames(xprepared.hsu.nuts2)[-1], sep = "_")
-#     }else if(length(functs)==1 && length(vbles)==1){
-#         colnames(xprepared.hsu.nuts2)[-1] <- paste(colnames(xprepared.hsu.nuts2)[-1], functs, sep = "_")
-#     }
-#     
-#     names(xprepared.hsu.nuts2) <- gsub("weighted.mean\\(., area\\)", "weighted.mean", names(xprepared.hsu.nuts2))
-#     
-#     
-# }else{
-#     stop("Please, provide a correct value for the argument data2ag (i.e. uscie or hsu)", call. = FALSE)
-# }
+#agg2admins <- function(xprepared, 
+#                       data2ag="hsu", 
+#                       functs=c("max", "min", "weighted.mean", "sd", "median"), 
+#                       #functs=c("max", "min", "mean", "sd", "median"), 
+#                       vbles, filenm4gdx, ...){
+#    
+#    start <- Sys.time()
+#    
+#    # agg<-function(x2agg,aggto,...){
+#    #     #print(x2agg[,eval(q)])
+#    #     by_hsu <- x2agg %>% group_by(eval(q))
+#    #     print(by_hsu)
+#    #     xaggd <- by_hsu %>% summarise_at(vbles, functs, ...)
+#    #     return(xaggd)
+#    # }
+#    print("Preparing to compute statistics...")
+#    # If original unit is uscie then first aggregate to hsu
+#    if(any(grepl("uscie", names(xprepared))==TRUE)){
+#        print("Computing statistics per HSU...")
+#        by_hsu <- xprepared %>% group_by(hsu)
+#        xprepared.hsu <- by_hsu %>% summarise_at(vbles, functs, ...)
+#        colnames(xagg)[1] <- "s_spatunit"  #changing 1st column name
+#        
+#        #HSU values will be the start the overall result
+#        xhsu<-as.data.table(xprepared.hsu)
+#        
+#        
+#        if(tolower(data2ag) == "uscie"){
+#            xagg<-xprepared
+#        }else if(tolower(data2ag) == "hsu"){
+#            xagg<-xprepared[,,drop=s_uscierc]
+#        }
+#    }else if(any(grepl("hsu", names(xprepared))==TRUE)){
+#        xprepared.hsu<-xprepared
+#        xagg<-xprepared
+#    }else{
+#        stop("Aggregation should start from either uscie or hsu!")
+#    }
+#    
+#    for (i in 1:length(functs)){   # this loop is to add the argument "area", nedded to compute weighted mean
+#        if (functs[i] == "weighted.mean"){      # this is to tell the function how to compute weighted mean
+#            functs[i] <- "weighted.mean(., area)"   
+#            if(!"area" %in% colnames(xprepared)) stop("please, provide a column called 'area' with areas", call. = FALSE)   # If a column called "area" with areas is not provided, an error message is issued and the function stops
+#        } else {
+#            functs[i] <- functs[i]
+#        }
+#    }
+#    
+#    print("Computing statistics per NUTS III...")
+#    by_nuts3 <- xagg %>% group_by(nuts3)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
+#    xprepared.nuts3 <- by_nuts3 %>% summarise_at(vbles, functs, ...)
+#    colnames(xprepared.nuts3)[1] <- "s_spatunit"  #changing 1st column name
+#    
+#    print("Computing statistics per CAPRI NUTS II...")
+#    by_CAPRI_NUTSII <- xagg %>% group_by(CAPRI_NUTSII)           #grouping the DataTable before to be passed to the summarise_each(), to be faster
+#    xprepared.caprinuts <- by_CAPRI_NUTSII %>% summarise_at(vbles, functs, ...)
+#    colnames(xprepared.caprinuts)[1] <- "s_spatunit"  #changing 1st column name
+#    
+#    print("Computing statistics per CAPRI NUTS 0...")
+#    by_CAPRI_NUTS0 <- xagg %>% group_by(CAPRI_NUTS0)           #grouping the DataTable before to be passed to the summarise_at(), to be faster
+#    xprepared.country <- by_CAPRI_NUTS0 %>% summarise_at(vbles, functs, ...)
+#    colnames(xprepared.country)[1] <- "s_spatunit"  #changing 1st column name
+#    
+#    ## Combining by rows ##
+#    print("Creating a table with the results...")
+#    xprepared.hsu.nuts2 <- rbind(xprepared.hsu, xprepared.nuts3, xprepared.caprinuts, xprepared.country)
+#    if(length(functs)==1 && length(vbles)>1){
+#        colnames(xprepared.hsu.nuts2)[-1] <- paste(colnames(xprepared.hsu.nuts2)[-1], functs, sep = "_")
+#    }else if(length(functs)>1 && length(vbles)==1){
+#        colnames(xprepared.hsu.nuts2)[-1] <- paste(vbles, colnames(xprepared.hsu.nuts2)[-1], sep = "_")
+#    }else if(length(functs)==1 && length(vbles)==1){
+#        colnames(xprepared.hsu.nuts2)[-1] <- paste(colnames(xprepared.hsu.nuts2)[-1], functs, sep = "_")
+#    }
+#    return(xprepared.hsu.nuts2)
 #}
+
 
 
 
 ## Exporting to a gdx file with ##
 
-export2gdx<-function(){
-    print("Exporting to a gdx file...")
+#export2gdx<-function(x2gdx, dim=dim, xfulln=xfulln, parn=parn){
+export2gdx<-function(x2gdx, dim=dim, parn=parn){
+  
+  print("Exporting to a gdx file...")
+  x2gdx_noNA <- x2gdx[complete.cases(x2gdx)]  # to remove NA's
+  x2gdx_noNA <- as.data.frame(x2gdx_noNA)
+  x2gdx_noNA <- droplevels(x2gdx_noNA)
+
+  #nm <- strsplit(xfulln,"*\\/|\\.")[[1]]   # to extract the name 
+  #nm <- tail(nm, 2)[1]
+  nm <- tolower(parn)
+
+  if(dim==1){
     
-    xprepared.hsu.nuts2_noNA <- xprepared.hsu.nuts2[complete.cases(xprepared.hsu.nuts2$s_spatunit), ]  # to remove NA's
-    xprepared.hsu.nuts2_noNA <- as.data.frame(xprepared.hsu.nuts2_noNA)
-    nm_table <- deparse(substitute(xprepared))   # to extract the name of the table
-    xprepared.hsu.nuts2_longDF <- data.frame()
+    symDim <- 2
+    attr(x2gdx_noNA,"symName") <- nm
+    attr(x2gdx_noNA, "ts") <- paste0("statistics calculated for ", nm)    #explanatory text for the symName
+    myText <- c("spatial unit", "statistics")     # explanatory text for the extracted index sets
+    lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+    wgdx.lst(paste0(nm, "_stats.gdx"), lst)
     
-    for (fct in 1:length(functs)){            #This is to stack the DataFrame in order to have a "long" format table, appropriate to be transformed to a gsx
-        
-        if(functs[fct]=="weighted.mean(., area)"){
-            newfctnm <- "weighted.mean"
-        }else{
-            newfctnm <- functs[fct]
-        }
-        
-        wideDFnms <- grep(newfctnm, names(xprepared.hsu.nuts2_noNA), value = TRUE)
-        longDF <- melt(xprepared.hsu.nuts2_noNA,
-                       id.vars=c("s_spatunit"),
-                       measure.vars = wideDFnms,
-                       variable.name = "s_variable",
-                       value.name = newfctnm)
-        
-        if (fct==1){
-            xprepared.hsu.nuts2_longDF <- longDF
-            xprepared.hsu.nuts2_longDF$s_variable <- as.character(xprepared.hsu.nuts2_longDF$s_variable)
-            pattern <- paste0("_", newfctnm)
-            xprepared.hsu.nuts2_longDF$s_variable <- gsub(pattern, "", xprepared.hsu.nuts2_longDF$s_variable, fixed = TRUE)
-            
-            
-        }else{
-            xprepared.hsu.nuts2_longDF <- cbind(xprepared.hsu.nuts2_longDF, longDF[, -c(1, 2)])
-            ncls  <- ncol(xprepared.hsu.nuts2_longDF)
-            names(xprepared.hsu.nuts2_longDF)[ncls] <- newfctnm
-        }
-    }
+  }else if(dim==2){
     
-    xprepared.hsu.nuts2_longDF[is.na(xprepared.hsu.nuts2_longDF)] <- 0    #to convert all NA's to 0
+    symDim <- 3
+    attr(x2gdx_noNA,"symName") <- nm
+    attr(x2gdx_noNA, "ts") <- paste0("statistics calculated for ", nm)    #explanatory text for the symName
+    myText <- c("spatial unit", "variables", "statistics")     # explanatory text for the extracted index sets
+    lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1,2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+    wgdx.lst(paste0(nm, "_stats.gdx"), lst)
+
+  }else if(dim==3){
     
-    
-    symDim <- 3 
-    attr(xprepared.hsu.nuts2_longDF,"symName") <- paste0("p_", nm_table)
-    attr(xprepared.hsu.nuts2_longDF, "ts") <- paste0(nm_table, " statistics per spatial unit")   #explanatory text for the symName
-    myText <- c("spatial entity", "variables", "statistics")     # explanatory text for the extracted index sets
-    
-    lst <- wgdx.reshape(xprepared.hsu.nuts2_longDF, symDim, tName = "s_stats", setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping 
-    
-    #wgdx.lst(paste0(filenm4gdx, ".gdx"), lst)
-    wgdx.lst(paste0(filenm4gdx, ".gdx"), lst)
-    
-    
-    print(paste0("Exported gdx as ", paste0(filenm4gdx, ".gdx")))
-    
-    print("End of Function 1")
-    
-    end <- Sys.time() - start
-    print(end)
-    gc()
-    
-    return(xprepared.hsu.nuts2)
-    
-    
-}    #End of Funct1  
+    symDim <- 4
+    attr(x2gdx_noNA,"symName") <- nm
+    attr(x2gdx_noNA, "ts") <- paste0("statistics calculated for ", nm)    #explanatory text for the symName
+    myText <- c("spatial unit 1", "spatial unit 2", "variables", "statistics")     # explanatory text for the extracted index sets
+    lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1,3,2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+    wgdx.lst(paste0(nm, "_stats.gdx"), lst)
+
+  }else{
+    stop("Function export2gdx not yet set-up for more than 3 dimensions")
+  }
+} #end of export2gdx
 
 
 
+
+# xavi20160826: these two functions are not yet included 
 
 ## Function 2.1: Multifunction used in func2 to compute several HSU - USCIE statistics 
 
-multi.fun.2.1 <- function(y) {
-    c(min = min(y), max = max(y), mean = mean(y), sd = sd(y), median = median(y))
+#multi.fun.2.1 <- function(y) {
+    #c(min = min(y), max = max(y), mean = mean(y), sd = sd(y), median = median(y))
     
-} #End of Function 2.1
+#} #End of Function 2.1
 
-## Function 2: Computing HSU - USCIE statistics
+## Function 2: Computing HSU - USCIE statistics 
 
-computestatistics <- function(x){
+#computestatistics <- function(x){
     
     ## computing HSU - USCIE statistics ##
     
-    start <- Sys.time()
-    print("Computing HSU - USCIE statistics...")
-    
-    count.hsu.uscie <-count_(x, vars="hsu")
-    stats.hsu.uscie <- round(multi.fun.2.1(count.hsu.uscie$n), 2)
-    
+#    start <- Sys.time()
+#    print("Computing HSU - USCIE statistics...")
+#    
+#    count.hsu.uscie <-count_(x, vars="hsu")
+#    stats.hsu.uscie <- round(multi.fun.2.1(count.hsu.uscie$n), 2)
+#    
     #save(stats.hsu.uscie, file ="stats.hsu.uscie.rdata")  # If Func2 is included to Func1, this line should be activated in order to save the result in disk
     #load(file = "stats.hsu.uscie.rdata")   # If Func2 is included to Func1, this line should be activated in order to load the result in the environment
     
     
-    print("End of Function 2")
-    end <- Sys.time() - start
-    print(end)
+#    print("End of Function 2")
+#    end <- Sys.time() - start
+#    print(end)
     
-    return(stats.hsu.uscie)
+#    return(stats.hsu.uscie)
     
-}  # End of Function 2
+#}  # End of Function 2
 
 
 
 
 
-## Function 3: preparedata - Preparing data set to run function 1
-
-# NOTES FOR THIS FUNCTION: 
-# It relates the data set with HSU (if it is based on USCIE) and NUTS. Also adds HSU areas
-# The first argument (x) is the data set (DataFrame)
-# Colname for USCIE codes has to be "s_uscierc". For HSU codes, "hsu". For MARS GRID, "grid"
 
 
 dataprep<-paste0(usciedatapath,"uscie_hsu2_nuts_marsgrid.rdata")
@@ -590,7 +560,6 @@ if(! file.exists(dataprep)){
     #load csv file linking uscie and grid numbers, dataset coming from capri/dat/capdis/uscie
     uscie_marsgrid <- fread(paste0(usciedatapath,"../hsu2_database_togdx_201605_nocita/","USCIE_PARAM.csv"), header=TRUE,select=c(1, 3)) 
     setnames(uscie_marsgrid,old=c("USCIE_RC","GRIDNO"),new=c("s_uscierc","marsgrid"))
-    
     # Merge uscie - marsgrid - with HSU2; eliminate empty HSU2 and MARS-grids
     setkey(uscie_hsu,"s_uscierc")
     setkey(uscie_marsgrid,"s_uscierc")
@@ -600,8 +569,23 @@ if(! file.exists(dataprep)){
     # Fraction of HSU2 that belongs to a certain MARSGRID
     marsgrid_hsu<-marsgrid_hsu[,`:=`(fraction=area/gridarea)]
     
+    ### Input 5: Fraction of EMEPGRID / EMEPGRID - EMEP_LC_CLASS per HSU2 ####
+    USCIE_EMEP_HSU2_LC <- fread(paste0(usciedatapath, "USCIE_EMEP_HSU2_LC.csv"), header=TRUE)
+    #setnames(USCIE_EMEP_HSU2_LC, old=c("i50_j50", "HSU2_IDRUN"), new=c("emepgrid","hsu"))
+    setnames(USCIE_EMEP_HSU2_LC, old=c("HSU2_IDRUN"), new=c("hsu"))
+    setkey(USCIE_EMEP_HSU2_LC, "hsu")
+    # Fraction of EMEPGRID per HSU2
+    hsu2_emepgrid_area <- USCIE_EMEP_HSU2_LC[,.(hsu_emep_area = .N), by=.(hsu, i50_j50)]
+    hsu2_emepgrid_area <- hsu2_emepgrid_area[,`:=`(emep_area = sum(hsu_emep_area)), by=hsu]
+    hsu2_emepgrid_area <- hsu2_emepgrid_area[,`:=`(frac_emep_hsu = hsu_emep_area/emep_area)]
+    # Fraction of EMEPGRID - EMEP_LC_CLASS per HSU2
+    hsu2_emepgrid_lc_area <- USCIE_EMEP_HSU2_LC[,.(hsu_emep_lc_area = .N), by=.(hsu, i50_j50, EMEP_LC_CLASS)]
+    hsu2_emepgrid_lc_area <- hsu2_emepgrid_lc_area[,`:=`(emep_lc_area = sum(hsu_emep_lc_area)), by=hsu]
+    hsu2_emepgrid_lc_area <- hsu2_emepgrid_lc_area[,`:=`(frac_emep_lu_hsu = hsu_emep_lc_area/emep_lc_area)]
     
-    #### 5. Export to a gdx file ####
+    
+    
+    #### 6. Export to a gdx file ####
     
     hsu2export <- hsu2_nuts[complete.cases(hsu2_nuts), ]  # to remove NA's
     hsu2export$hsu<-paste0("U",hsu2export$hsu)
