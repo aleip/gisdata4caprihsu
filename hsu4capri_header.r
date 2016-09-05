@@ -35,6 +35,7 @@ setwd(workpath)
 igdx(gamspath)
 
 
+
 agguscie2hsu<-function(x2agg,xfrom,xto,xvbles,dim,functs, varbles){
   
   
@@ -110,8 +111,14 @@ agguscie2hsu<-function(x2agg,xfrom,xto,xvbles,dim,functs, varbles){
   
   if(xfrom=="s_uscierc" | xfrom=="hsu"){
     if(xfrom=="hsu") setnames(x2agg,old=xto,new="xto")
+    if(xfrom=="s_uscierc"){
+      setnames(x2agg,old="mean", new="value")
+      xvbles <- "value"  #xavi: if it's called the same that the function to compute ("mean"), summarise_at tries to compute SD and median from the just computed new column for the means
+    } 
     
     print(paste0("Computing statistics from ", xfrom, " to ", xto, "!"))
+    print(paste0("Computing ", paste0(functs, collapse = ", ")))
+    
     
     if(dim==1){
       xres<-as.data.table(summarise_at(group_by(x2agg,xto),xvbles, functs, na.rm=TRUE))
@@ -174,7 +181,7 @@ preparedata <- function(xstart){
   }
   
   return(x3)
-} #End of func3
+} #End of preparedata
 
 
 
@@ -263,7 +270,6 @@ loadcsv<-function(xfulln, varbles){
   return(list(dep, dim, parname))
   
 }# End of loadcsv
-
 
 
 processdata<-function(xfulln,oldn=NULL,newn=NULL,spatunit="s_uscierc",parn=NULL,functs=c("max", "min", "mean", "sd", "median"), varbles=NULL, sets=NULL){
@@ -475,7 +481,7 @@ export2gdx<-function(x2gdx, dim=dim, parn=parn){
     symDim <- 4
     attr(x2gdx_noNA,"symName") <- nm
     attr(x2gdx_noNA, "ts") <- paste0("statistics calculated for ", nm)    #explanatory text for the symName
-    myText <- c("spatial unit 1", "spatial unit 2", "variables", "statistics")     # explanatory text for the extracted index sets
+    myText <- c("spatial unit", "variables", "variables 2", "statistics")     # explanatory text for the extracted index sets
     lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1,3,2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
     wgdx.lst(paste0(nm, "_stats.gdx"), lst)
 
