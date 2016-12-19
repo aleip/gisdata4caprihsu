@@ -1,5 +1,5 @@
 rm(list=objects())
-source("X:/MARS_disaggregation/gisdata4caprihsu/hsu4capri_header.r") #this is only used while coding
+source("/Users/xavi/Documents/JRC_MARS/gisdata4caprihsu/hsu4capri_header.r") #this is only used while coding
 #source("hsu4capri_header.r")
 
 

@@ -2,6 +2,8 @@
 rm(list=objects())
 library(data.table)
 library(plyr)
+#library(devtools)
+#install_github("hadley/dplyr@master")   #to install the last version of dplyr
 library(dplyr)    #installed the dev version from https://github.com/hadley/dplyr
 #library(reshape)
 library(reshape2)
@@ -21,6 +23,11 @@ if(Sys.info()[4]=="L01RI1203587"){ #checks machine name
     gamspath<-"C:/GAMS/win64/24.4"
     workpath<-"x:/adrian/tools/rprojects/gisdata4caprihsu/"
     capridat<-"x:/adrian/models/capri/trunk20160810/dat/capdis/hsu2/"
+}else if(Sys.info()[4]=="MacBook-Pro-de-Xavier.local"){ #checks machine name
+    workpath<-"/Users/xavi/Documents/JRC_MARS/hsu2_statistics_xavi2/"
+    gamspath<-"/Applications/GAMS24.6/sysdir"
+    usciedatapath<-workpath
+    capridat<-workpath
 }else{
     workpath<-"X:/MARS_disaggregation/hsu2_statistics_xavi2/"
     usciedatapath<-workpath
@@ -646,10 +653,10 @@ if(! file.exists(dataprep)){
     wgdx.lst("hsu2_nuts1", lst,hsu2set,nuts3set,nuts2set,smuset,scaprinuts2set,scapricountriesset,mn3,mn2,mn0,mn)
     
     ### 6., Save data in rdata format ####
-    save(hsu2_nuts,uscie_hsu,marsgrid_hsu,mnuts3nuts2,mnuts3srnuts2,msrnuts2nuts0,mnuts0,file=dataprep)
+    save(hsu2_nuts,uscie_hsu,marsgrid_hsu,mnuts3nuts2,mnuts3srnuts2,msrnuts2nuts0,mnuts0, file=dataprep)
     rm(hsu2export,uscie_marsgrid)
     
 }else{
-    load(file = dataprep)
+    load(file = dataprep, verbose = TRUE)
 }
 
