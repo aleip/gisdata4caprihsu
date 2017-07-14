@@ -179,29 +179,6 @@ wgdx.lst("centroids_spatialunit", c(lst, lst1, lst2))
 
 
 
-#### FOREST SHARE ####
-#memory.limit(size = 2048000)
-#This dataset contains forest share data at USCIE level
-xresult<-processdata(paste0(capridat,"forestshare.gdx"))
-
-
-
-#### DIGITAL ELEVATION MODEL ####
-
-#gdxInfo("uscie_dem.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
-#This dataset contains forest share data at USCIE level
-xresult<-processdata(paste0(capridat,"uscie_dem.gdx"))
-# xavi: I'm not sure about the spatial units here
-
-
-#### IRRISHARE ####
-
-#gdxInfo("uscie_irrishare.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
-#This dataset contains irrigation data at USCIE level.
-
-xresult<-processdata(paste0(capridat,"uscie_irrishare.gdx"))
-
-
 #### SOIL ####
 
 #gdxInfo("soil_hwsd.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
