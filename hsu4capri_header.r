@@ -42,176 +42,6 @@ setwd(workpath)
 #link with gams directory
 igdx(gamspath)
 
-
-linkxto2xfrom<-function(x2agg,xfrom,xto){
-
-    if(xfrom=="s_uscierc"){
-        print(paste0("Linking ", xfrom, " data with ", xto))
-        x2agg$s_uscierc<-as.integer(as.character(x2agg$s_uscierc))
-        setkey(x2agg,s_uscierc)
-        xhsu<-xhsu<-x2agg[uscie_hsu]   # merge HSU (left join)
-        x2agg<-xhsu[complete.cases(xhsu)]
-    }else if(xfrom=="marsgrid"){
-        print(paste0("Linking ", xfrom, " data with ", xto))
-        setkey(marsgrid_hsu, marsgrid)
-        xhsu<-x2agg[marsgrid_hsu, allow.cartesian=TRUE]
-        if(ndim==3){
-            x2agg <- xhsu[,.(value =  weighted.mean(mean, fraction)), by=.(hsu, j, k)]  #xavi: this step takes a bit long
-        }else{  #xavi: for now, always ndim is 2 or 3
-            x2agg <- xhsu[,.(value =  weighted.mean(mean, fraction)), by=.(hsu, j)]
-        }
-        setnames(x2agg, old=c("value"), new=c("mean"))
-    }else if(xfrom=="emepgrid"){
-        print(paste0("Linking ", xfrom, " data with ", xto))  
-        
-        if(any(grepl("WD", varbles)==TRUE)){   #This is for Wet Deporition
-            
-            dep_unique <- unique(x2agg, by="i50_j50")
-            longDT <- melt(dep_unique,
-                           id.vars = "i50_j50",
-                           measure.vars = varbles,
-                           variable.name = "j",
-                           value.name = "value")
-            setkey(longDT, i50_j50) # to set a key column of the DataTable
-            setkey(hsu2_emepgrid_area, i50_j50)
-            emep_hsu<-longDT[hsu2_emepgrid_area, allow.cartesian=TRUE]   # merge HSU (left join)
-            x2agg <- emep_hsu[,.(value =  weighted.mean(value, frac_emep_hsu)), by=.(hsu, j)]
-            
-        }else if(any(grepl("DD", varbles)==TRUE)){  #This is for Dry deposition
-            dep_unique <- unique(x2agg, by=c("i50_j50", "EMEP_LC_CLASS"))
-            longDT <- melt(dep_unique,
-                           id.vars = c("i50_j50", "EMEP_LC_CLASS"),
-                           measure.vars = varbles,
-                           variable.name = "j",
-                           value.name = "value")
-            setkey(longDT, i50_j50) # to set a key column of the DataTable
-            setkey(hsu2_emepgrid_lc_area, i50_j50)
-            emep_hsu <- merge(longDT, hsu2_emepgrid_lc_area, by = c("i50_j50", "EMEP_LC_CLASS"), allow.cartesian=TRUE)
-            x2agg <- emep_hsu[,.(value =  weighted.mean(value, frac_emep_lu_hsu)), by=.(hsu, j)]
-        }
-        setnames(x2agg, old=c("value"), new=c("mean"))
-        setkey(x2agg, xto)
-    }else if (xfrom=="hsu"){
-        #Nothing to do
-    }else{
-        stop(paste0("Stop function linkxto2xfrom Unit to aggregate from: ",xfrom," is not implemented."))
-    }
-    return(x2agg)
-}
-
-agguscie2hsu<-function(x2agg,xfrom,xto,xvbles,ndim,functs){
-    
-    ## Function agguscie2hasu: Computing statistics per HSU, NUTS 3-2-0.
-    
-    # This function aggregates data from a unit at higher resolutions (e.g. uscie, hsu, marsgrid,...) to a unit of coarser resolution (e.g. hsu, nutsX)
-    # It is called various times from the function processdata
-    
-    # If weighted mean wants to be computed, in the data table must be one column called "area". If it is not provided, an error message is issued and the function stops
-    # The 
-    
-    # x2agg: paramter containing the data to be aggregated (in column xvbles)
-    # xfrom: spatial unit at higher spatial resolution (i.e. uscie, hsu)
-    # xto: spatial unit at coarser spatial resolution(i.e. hsu, nuts3, nuts2, nuts0)
-    # xvbles: variable-name (column name) of parameter x2agg for variable to be aggregated
-    #         xvbles may also be a vector, e.g. xvbles = c("f_2000", "f_2006")
-    # ndim: number of dimensions of parameter x2agg. So far, only aggregation of parameters with 2 or 3 dimensions has been implemented
-    # functs: statistical parameter that should be calculated. Is set in function processdata, currently as functs=c("max", "min", "mean", "sd", "median")
-    
-    #For weighted mean return the weighting column (area) otherwise leave functs unchanged
-    for (i in 1:length(functs)){   # this loop is to add the argument "area", nedded to compute weighted mean
-        if (functs[i] == "weighted.mean(., area)"){      # this is to tell the function how to compute weighted mean
-            if(!"area" %in% colnames(x2agg)) stop("please, provide a column called 'area' with areas", call. = FALSE)   # If a column called "area" with areas is not provided, an error message is issued and the function stops
-        }
-    }
-    xtemp<-copy(x2agg)
-    #print(colnames(xtemp))
-    setnames(xtemp,old<-xto,new<-"xto")
-    #print(colnames(xtemp))
-    if(xfrom=="s_uscierc" | xfrom=="hsu"){
-        print(paste0("Computing statistics from ", xfrom, " to ", xto, "!"))
-        print(paste0("Computing ", paste0(functs, collapse = ", ")))
-        
-        # Weighted mean cannot be calculated as the other statistical moments with summarise_at
-        functs2<-functs[!functs %in% c("weighted.mean(., area)")]
-        
-        if(ndim==1){
-            if(length(functs2)>0)xres<-as.data.table(summarise_at(group_by(xtemp,xto),xvbles, functs2, na.rm=TRUE))
-            if (any(functs=="weighted.mean(., area)")){
-                for(i in 1:length(xvbles)){
-                    #Rename column to 'value' so that the function works but name it back later so that the next can continue
-                    colnames(xtemp)[which(colnames(xtemp)==xvbles[i])]<-"value"
-                    xres2 <- ddply(xtemp, c("xto"), function(X) data.frame(value = weighted.mean(X$value, X$area,na.rm=TRUE)))
-                    xres <- cbind(xres, xres2$value)
-                    setnames(xres, "V2",xvbles[i])
-                    colnames(xres)[which(colnames(xtemp)=="value")]<-xvbles[i]
-                }
-            }
-        }else if(ndim==2){
-            if(length(functs2)>0)xres<-as.data.table(summarise_at(group_by(xtemp,j,xto),xvbles, functs2, na.rm=TRUE))
-            if (any(functs=="weighted.mean(., area)")){
-                for(i in 1:length(xvbles)){
-                    colnames(xtemp)[which(colnames(xtemp)==xvbles[i])]<-"value"
-                    xres2 <- ddply(xtemp, c("j", "xto"), function(X) data.frame(value = weighted.mean(X$value, X$area)))
-                    xres <- cbind(xres,xres2$value)
-                    setnames(xres, "V2","value")
-                    colnames(xres)[which(colnames(xtemp)=="value")]<-xvbles[i]
-                }
-            }
-        }else if(ndim==3){
-            if(length(functs2)>0)xres<-as.data.table(summarise_at(group_by(xtemp,j,k,xto),xvbles, functs2, na.rm=TRUE))
-            if (any(functs=="weighted.mean(., area)")){
-                xres2 <- ddply(xtemp, c("j", "k", "xto"), function(X) data.frame(value = weighted.mean(X$value, X$area)))
-                xres <- cbind(xres, xres2$value)
-                setnames(xres, "V2","value")
-            }
-        }else{
-            stop("Function aggs_uscierc2hsu not yet set-up for more than 3 dimensions")
-        }
-        
-    }else{
-        xres <- xtemp
-    }
-
-    for (jjj in (ndim+1):ncol(xres)) set(xres,which(is.na(xres[[jjj]])),jjj,0)
-    xres<-xres[xto!=""]
-    setkey(xres,xto)
-    setnames(xres,new=xto,old="xto")
-    colnames(xres)<-gsub("mean","value",colnames(xres))
-    colnames(xres)<-gsub("_value","",colnames(xres))
-    if(ndim>1){
-        xresn<-c(xto,letters[10:(10+ndim-2)],xvbles)
-    }else{
-        xresn<-c(xto,xvbles)
-    }
-    View(xres)
-    print(colnames(xres))
-    print(xresn)
-    xresn<-c(xresn,colnames(xres)[!colnames(xres)%in%xresn])
-    xres<-xres[,xresn,with=FALSE]
-    return(xres)  
-    
-} #end of agguscie2hsu
-
-preparedata <- function(xstart){
-    
-    print("Adding NUTS info...")
-    if(any(grepl("hsu", names(xstart))==TRUE)){  #to add hsu areas and NUTS data
-        
-        xstart$hsu <- as.numeric(as.character(xstart$hsu))
-        setkey(xstart, hsu) # to set a key column
-        hsu2_nuts$hsu <- as.numeric(as.character(hsu2_nuts$hsu))
-        setkey(hsu2_nuts, hsu) # to set a key column
-        x3<-xstart[hsu2_nuts]
-        x3<-x3[!is.na(hsu)]
-        setkey(x3, hsu) # to set a key column
-        
-    }else if(any(grepl("mu_global", names(xstart))==TRUE)){
-    }else{
-        stop("Unknown spatial units of the data, It should be 'hsu'")
-    }
-    return(x3)
-} #End of preparedata
-
 loadgdxfile<-function(xfulln, parname=NULL, sets=NULL){
     pars<-as.data.table(gdxInfo(xfulln,dump=FALSE,returnList=FALSE,returnDF=TRUE)$parameters$name)
     dims<-as.data.table(gdxInfo(xfulln,dump=FALSE,returnList=FALSE,returnDF=TRUE)$parameters$dim)
@@ -255,29 +85,6 @@ loadgdxfile<-function(xfulln, parname=NULL, sets=NULL){
     return(list(x,ndim,parname))
     
 } #End of loadgdxfile
-
-loadcsv<-function(xfulln, varbles){
-    
-    if(any(grepl("WD", varbles)==TRUE)){   #This is for Wet Deporition
-        
-        dep<-fread(xfulln, header=TRUE, select=c("i50_j50", varbles))
-        setkey(dep,i50_j50) # to set a key column of the DataTable
-        
-    }else if(any(grepl("DD", varbles)==TRUE)){  #This is for Dry deposition
-        dep<-fread(xfulln, header=TRUE, select=c("i50_j50","EMEP_LC_CLASS", varbles))
-        setkey(dep,i50_j50) # to set a key column of the DataTable
-    }
-    
-    ndim <- 2   # for now, this is hardcoded
-    
-    nm <- strsplit(xfulln,"\\.")[[1]]
-    nm <- strsplit(nm[1],"_")[[1]]
-    nm <- tail(nm, 2)[1:2]
-    parname <- paste(nm, collapse = "_")
-    
-    return(list(dep, ndim, parname))
-    
-}# End of loadcsv
 
 getlucas<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,functs=c("max", "min", "mean", "sd", "median"), sets=NULL){
     
@@ -330,6 +137,25 @@ getlucas<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,fun
     return(lucas)    
 }
 
+gethsufraction<-function(xlinked,xvbles){
+    xlinked2<-xlinked[,.(count = .N),by=.(hsu,LC1_ID)]
+    tmp<-xlinked2[,.(tot=sum(count)),by=.(hsu)]
+    #setkey(xlinked2,"hsu")
+    #setkey(tmp,"hsu")
+    xlinked2<-xlinked2[tmp,on="hsu"]
+    xlinked2$count<-as.numeric(xlinked2$count)
+    xlinked2$tot<-as.numeric(xlinked2$tot)
+    xlinked2$fraction<-as.numeric(xlinked2$count/xlinked2$tot)
+    #setnames(xlinked2,old="value",new=xvbles)
+    xlinked<-xlinked2[,c("hsu",xvbles,"fraction"),with=FALSE]
+    
+    lc1map<- fread(paste0(usciedatapath,"USCIE_PARAM_LC1_ID_CLC.csv"))
+    xloaded<- xlinked[lc1map,on="LC1_ID"] #merge(corine_uscie, LC1_ID_CLC, all.x = TRUE)
+    xloaded<-xloaded[,c("hsu","CLC","fraction")]
+    setnames(xloaded,"CLC","j")
+    return(xloaded)    
+}
+
 processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,functs=c("max", "min", "mean", "sd", "median"), sets=NULL){
     #x: data table that contains one row with the original unit and further rows with variables of the name 'newn'
     #xn: part of the file names to be generated
@@ -363,13 +189,16 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
         }
     }else if(fileext=="csv"){
         print("Loading csv file...")
-        if(spatunit=="s_uscierc") origvar<-"USCIE_RC"
-        if(spatunit=="hsu") origvar<-"HSU2_IDRUN"
         xloaded<-fread(xfulln, header=TRUE)
         if(file.exists(gsub(".csv","_METADATA.csv",xfulln)))
             xmetadata<-fread(gsub(".csv","_METADATA.csv",xfulln), header=TRUE)
+        
+        if(spatunit=="s_uscierc") origvar<-"USCIE_RC"
+        if(spatunit=="hsu") origvar<-"HSU2_IDRUN"
         setnames(xloaded,old=origvar,new=spatunit)
+        
         if("MU_GLOBAL"%in%colnames(xloaded)) xloaded<-xloaded[,-"MU_GLOBAL",with=FALSE]
+        print(xvbles)
         if(!is.null(xvbles)){
             xloaded<-xloaded[,which(colnames(xloaded)%in%c("s_uscierc",xvbles)),with=FALSE]
         }else{
@@ -387,27 +216,13 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
             setkey(xloaded,"s_uscierc")
             xlinked<-xloaded[uscie_hsu]
         }
-        if(xvbles%in%c("CLC")){
-            # Required shares not average
-            xlinked2<-xlinked[,.(count = .N),by=.(hsu,CLC)]
-            tmp<-xlinked2[,.(tot=sum(count)),by=.(hsu)]
-            #setkey(xlinked2,"hsu")
-            #setkey(tmp,"hsu")
-            xlinked2<-xlinked2[tmp,on="hsu"]
-            xlinked2$count<-as.numeric(xlinked2$count)
-            xlinked2$tot<-as.numeric(xlinked2$tot)
-            xlinked2$fraction<-as.numeric(xlinked2$count/xlinked2$tot)
-            #setnames(xlinked2,old="value",new=xvbles)
-            xlinked<-xlinked2[,c("hsu",xvbles,"fraction"),with=FALSE]
-            
-            lc1map<- fread(paste0(usciedatapath,"USCIE_PARAM_LC1_ID_CLC.csv"))
-            xloaded<- xlinked[lc1map,on="LC1_ID"] #merge(corine_uscie, LC1_ID_CLC, all.x = TRUE)
-            xloaded<-xloaded[,c("hsu","CLC","fraction")]
+        if(xvbles%in%c("LC1_ID")){
+            print("# Required shares not average")
+            xloaded<-gethsufraction(xlinked = xlinked,xvbles = xvbles)
             spatunit<-"hsu"
-            ndim<-2
+            #ndim<-2
             functs<-c("mean","median","min","max")
             xvbles<-"fraction"
-            setnames(xloaded,"CLC","j")
             
         }
         if(xvbles[1]=="dep") {
@@ -415,6 +230,25 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
             ndim<-x[[2]]
             parn<-x[[3]]
             xloaded<-x[[1]]
+        }
+    }else if(fileext=="rdata"){
+        load(xfulln)
+        if(xvbles=="EMEPdep"){
+            
+            # File preprocessed with \\ies-ud01.jrc.it\D5_agrienv\Data\uscie\hsu2_database_update_2016_02orig\USCIE_EMEP_HSU2.r
+            # loaded.
+            
+            # Remove cols that are not needed here
+            xloaded<-emepdep[,c("hsu","dep","cmp","06","07","08","09","10","frac_hsu")]
+            xloaded<-melt(xloaded,measure.vars = c("06","07","08","09","10"),value.name = xvbles,variable.name = "year")
+            xloaded$EMEPdep<-xloaded$EMEPdep*xloaded$frac_hsu
+            xloaded<-as.data.table(summarise_at(group_by(xloaded,hsu,dep,cmp,year),"sharedep","sum", na.rm=TRUE))
+            
+            ndim<-4
+            
+            origdepnames<-c("dep","cmp","year")
+            newdepnames<-c("j","k","l")
+            setnames(xloaded,origdepnames,newdepnames)
         }
     }else{
         stop(paste0("No loading procedure for files with extension ",fileext," has been developed yet..."))
@@ -455,7 +289,7 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
     # Aggregation from HSU to administrative regions must be area-weighted
     # If already some specific 'mean' had been defined leave it as is
     if("mean"%in%functs) {functs <- replace(functs, functs=="mean", "weighted.mean(., area)")}
-    save(xstart,functs,xvbles,ndim,file="xstart339.rdata")
+    save(xstart,functs,xvbles,ndim,xfrom,xto,file="xstart339.rdata")
     xnuts3<-agguscie2hsu(xstart,xfrom="hsu",xto="nuts3",xvbles=xvbles,ndim=ndim,functs=functs)
     xnuts2<-agguscie2hsu(xstart,xfrom="hsu",xto="CAPRI_NUTSII",xvbles=xvbles,ndim=ndim,functs=functs)
     xnuts0<-agguscie2hsu(xstart,xfrom="hsu",xto="CAPRI_NUTS0" ,xvbles=xvbles,ndim=ndim,functs=functs)
@@ -482,7 +316,7 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
     
     if(ndim==2) setnames(xall,old="j",new="variables") 
     if(ndim==3) setnames(xall,old=c("j", "k"), new=c("spatial_unit2", "variables"))
-    
+    if(any(colnames(xall)=="fraction")) setnames(xall,"fraction","value")
     if(!parn%in%c("p_domstutop")){
         #statistical moments exist
         export2gdx(xall, ndim=ndim, parn=parn)  # to export to gdx
@@ -613,19 +447,6 @@ if(! "uscie_hsu"%in%ls()){
         # Fraction of HSU2 that belongs to a certain MARSGRID
         marsgrid_hsu<-marsgrid_hsu[,`:=`(fraction=area/gridarea)]
         
-        ### Input 5: Fraction of EMEPGRID / EMEPGRID - EMEP_LC_CLASS per HSU2 ####
-        USCIE_EMEP_HSU2_LC <- fread(paste0(usciedatapath, "USCIE_EMEP_HSU2_LC.csv"), header=TRUE)
-        #setnames(USCIE_EMEP_HSU2_LC, old=c("i50_j50", "HSU2_IDRUN"), new=c("emepgrid","hsu"))
-        setnames(USCIE_EMEP_HSU2_LC, old=c("HSU2_IDRUN"), new=c("hsu"))
-        setkey(USCIE_EMEP_HSU2_LC, "hsu")
-        # Fraction of EMEPGRID per HSU2
-        hsu2_emepgrid_area <- USCIE_EMEP_HSU2_LC[,.(hsu_emep_area = .N), by=.(hsu, i50_j50)]
-        hsu2_emepgrid_area <- hsu2_emepgrid_area[,`:=`(emep_area = sum(hsu_emep_area)), by=hsu]
-        hsu2_emepgrid_area <- hsu2_emepgrid_area[,`:=`(frac_emep_hsu = hsu_emep_area/emep_area)]
-        # Fraction of EMEPGRID - EMEP_LC_CLASS per HSU2
-        hsu2_emepgrid_lc_area <- USCIE_EMEP_HSU2_LC[,.(hsu_emep_lc_area = .N), by=.(hsu, i50_j50, EMEP_LC_CLASS)]
-        hsu2_emepgrid_lc_area <- hsu2_emepgrid_lc_area[,`:=`(emep_lc_area = sum(hsu_emep_lc_area)), by=hsu]
-        hsu2_emepgrid_lc_area <- hsu2_emepgrid_lc_area[,`:=`(frac_emep_lu_hsu = hsu_emep_lc_area/emep_lc_area)]
         
         
         

@@ -176,21 +176,6 @@ wgdx.lst("centroids_spatialunit", c(lst, lst1, lst2))
 
 
 
-
-
-
-#### SOIL ####
-
-#gdxInfo("soil_hwsd.gdx", dump=FALSE, returnList=FALSE, returnDF=TRUE) # to get info of the gdx file
-#This dataset contains soil data at HSU2 level.
-
-xresult<-processdata(paste0(capridat,"soil_hwsd.gdx"), spatunit="hsu", parn = "p_soildom")
-
-
-
-
-
-
 #### WET DEPOSITION FOR OXN, RDN, and SOX ####
 
 

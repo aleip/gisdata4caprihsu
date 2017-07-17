@@ -1,16 +1,16 @@
 source("hsu4capri_header.r")
+source("hsu4capri_functions.r")
 
 doforest<-0
 dodem<-0
 doirri<-0
 dosoil<-0
 dolucas<-0
+docorine<-0
+
+dodeposition<-0
 
 
-docorine<-1
-
-dowdep<-0
-doddep<-0
 dometeo<-0
 domarsyield<-0
 docentroids<-0
@@ -37,10 +37,16 @@ if(dosoil==1){
                          parn="p_domstutop")
 }
 if(docorine==1){
-    xresult<-processdata(xfulln = paste0(usciedatapath,"USCIE_PARAM.csv"),xvbles = "LC1_ID")
+    xresult<-processdata(xfulln = paste0(usciedatapath,"USCIE_PARAM.csv"),xvbles = "LC1_ID",parn="CLC_fraction")
 }
 if(dolucas==1){
     xresult<-getlucas(xfulln = paste0(usciedatapath,"../lucas/LUCAS09EU23_USCIERC.csv"),
                          parn="lucas",
                          xvbles = c("POINT_ID", "X_LAEA", "Y_LAEA", "Year", "USCIE_RC", "LC1"))
 }
+
+if(dodeposition==1){
+    xresult<-processdata(xfulln = paste0(usciedatapath,"USCIE_EMEP_LC_HSU2_W-DDP.rdata"),spatunit="hsu",xvbles="EMEPdep")
+}
+
+
