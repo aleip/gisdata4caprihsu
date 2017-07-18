@@ -186,3 +186,22 @@ agguscie2hsu<-function(x2agg,xfrom,xto,xvbles,ndim,functs){
     
 } #end of agguscie2hsu
 
+
+pardescription<-function(parn=NULL){
+    
+    # Description to be used in the gdx-file
+    # Attention! Limit to 255 characters
+    
+    if(parn=="p_emepdeposition"){
+        
+        description<-paste0("Average DRY or WET deposition (mg N m-2 yr-1). ",
+                            "Dry dep. is calculated with Land-cover-specific deposition estimates",
+                            "Wet deposition data are constant within each EMEP grid cell. ",
+                            "EMEP/EMEP-LC -> uscie -> HSU. ")
+        
+        
+    }
+    
+    
+    return(description)
+}

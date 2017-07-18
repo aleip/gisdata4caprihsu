@@ -103,15 +103,15 @@ getlucas<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,fun
     fileext<-strsplit(xfulln,"\\.")[[1]]
     fileext<-fileext[length(fileext)]
     origvar<-"USCIE_RC"
-
+    
     #lucas01<-getonelucas(2001)
     #lucas03<-getonelucas(2003)
     lucas06<-getonelucas(2006)
     lucas09<-getonelucas(2009)
     lucas12<-getonelucas(2012)
-
+    
     lucas<-rbind(lucas06,lucas09,lucas12)
- 
+    
     
     lucas_capri <- fread(paste0(usciedatapath,"../lucas/","lucas_capri.csv"))
     lucas_capri <- unique(lucas_capri)
@@ -120,7 +120,7 @@ getlucas<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,fun
     lucas$CAPRI_names[grepl("^E",lucas$LC1)]<-"GRAS"
     lucas$CAPRI_names[grepl("^G",lucas$LC1)]<-"OTHE"
     setnames(lucas, "CAPRI_names", "CAPRI")
-
+    
     
     xloaded<-lucas
     xdimnam<-c("spatial_unit","Year","POINT_ID")
@@ -206,8 +206,8 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
         }
         
         if(!newn=="") {
-                colnames(xloaded)[which(colnames(xloaded)==xvbles)]<-newn
-                xvbles<-newn
+            colnames(xloaded)[which(colnames(xloaded)==xvbles)]<-newn
+            xvbles<-newn
         }
         ndim=1
         if(spatunit=="s_uscierc"){
@@ -245,17 +245,25 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
             xloaded<-as.data.table(summarise_at(group_by(xloaded,hsu,dep,cmp,year),"sharedep","sum", na.rm=TRUE))
             
             ndim<-4
+            parn<-"p_emepdeposition"
             
-            origdepnames<-c("dep","cmp","year")
-            newdepnames<-c("j","k","l")
-            setnames(xloaded,origdepnames,newdepnames)
+            orignames<-c("dep","cmp","year")
+            newnames<-c("j","k","l")
+            setnames(xloaded,orignames,newnames)
+            # Now set column names as they shoudl apprear in the gdx file
+            orignames<-c("WetOrDryDep","Compound","Year")
+            origexpl<-c("Indicates if value refers to wet (WDEP) or dry (DDEP) deposition.",
+                        "Deposited compound: OXN: oxidized nitrogen, RDN: reduced nitrogen, SOX: oxidized sulphur.",
+                        "Year")
+            
+            
         }
     }else{
         stop(paste0("No loading procedure for files with extension ",fileext," has been developed yet..."))
     }
     
     save(ndim,parn,xloaded,spatunit,functs,file="dem.rdata")
-
+    
     #functs=c("max", "min", "mean", "sd", "median")
     if(spatunit=="s_uscierc"){  
         
@@ -307,19 +315,23 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
     
     xhsu$hsu<-paste0("U",xhsu$hsu)
     colnames(xhsu)[1]<-"spatial_unit"
-    if(spatunit=="s_uscierc"){
-        xall<-rbind(xnuts0,xnuts2,xnuts3,xhsu)
-    }else{  
-        xall<-rbind(xnuts0,xnuts2,xnuts3)
-        #xallstats<-melt(xall,"spatial_unit",)
-    }
+    xall<-rbind(xnuts0,xnuts2,xnuts3,xhsu,fill=TRUE)
+    # if(spatunit=="s_uscierc"){
+    #     xall<-rbind(xnuts0,xnuts2,xnuts3,xhsu,fill=TRUE)
+    # }else{  
+    #     xall<-rbind(xnuts0,xnuts2,xnuts3)
+    #     #xallstats<-melt(xall,"spatial_unit",)
+    # }
     
-    if(ndim==2) setnames(xall,old="j",new="variables") 
-    if(ndim==3) setnames(xall,old=c("j", "k"), new=c("spatial_unit2", "variables"))
+    if(xvbles=="EMEPdep"){
+        setnames(xall,newnames,orignames)
+    }else if(ndim==2) {setnames(xall,old="j",new="variables")
+    }else if(ndim==3) {setnames(xall,old=c("j", "k"), new=c("spatial_unit2", "variables"))}
+    
     if(any(colnames(xall)=="fraction")) setnames(xall,"fraction","value")
     if(!parn%in%c("p_domstutop")){
         #statistical moments exist
-        export2gdx(xall, ndim=ndim, parn=parn)  # to export to gdx
+        export2gdx(xall, ndim=ndim, parn=parn,pardesc=pardescription(parn),vars=orignames,myvars = origexpl)  # to export to gdx
     }else{
         #for soil, too many parameters, only mean is saved
         gall<-melt(xall,"spatial_unit",xvbles,"variables","value")
@@ -335,70 +347,34 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
 ## Exporting to a gdx file with ##
 
 #export2gdx<-function(x2gdx, ndim=ndim, xfulln=xfulln, parn=parn){
-export2gdx<-function(x2gdx, ndim=ndim, parn=parn,statistics=1){
+export2gdx<-function(x2gdx, ndim=ndim, parn=parn,statistics=1,pardesc=NULL,vars=NULL,myvars=NULL){
     
     print("Exporting to a gdx file...")
     x2gdx_noNA <- x2gdx[complete.cases(x2gdx)]  # to remove NA's
     x2gdx_noNA <- as.data.frame(x2gdx_noNA)
     x2gdx_noNA <- droplevels(x2gdx_noNA)
     
-    #nm <- strsplit(xfulln,"*\\/|\\.")[[1]]   # to extract the name 
-    #nm <- tail(nm, 2)[1]
-    nm <- tolower(parn)
+    if(! is.null(vars)&ndim>1){
+        # Rename columns
+        oldn<-names(x2gdx_noNA)[which(names(x2gdx_noNA)==letters[10:(10+ndim-2)])]
+        setnames(x2gdx_noNA,letters[10:(10+ndim-2)],vars)
+    }
     
-    if(statistics==1){
-    if(ndim==1){
-        
-        symDim <- 2
-        attr(x2gdx_noNA,"symName") <- nm
-        attr(x2gdx_noNA, "ts") <- paste0("statistics calculated for ", nm)    #explanatory text for the symName
-        myText <- c("spatial unit", "statistics")     # explanatory text for the extracted index sets
-        lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
-        wgdx.lst(paste0(nm, "_stats.gdx"), lst)
-        
-    }else if(ndim==2){
-        
-        symDim <- 3
-        attr(x2gdx_noNA,"symName") <- nm
-        attr(x2gdx_noNA, "ts") <- paste0("statistics calculated for ", nm)    #explanatory text for the symName
-        myText <- c("spatial unit", "variables", "statistics")     # explanatory text for the extracted index sets
-        lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1,2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
-        wgdx.lst(paste0(nm, "_stats.gdx"), lst)
-        
-    }else if(ndim==3){
-        
-        symDim <- 4
-        attr(x2gdx_noNA,"symName") <- nm
-        attr(x2gdx_noNA, "ts") <- paste0("statistics calculated for ", nm)    #explanatory text for the symName
-        myText <- c("spatial unit", "variables", "variables 2", "statistics")     # explanatory text for the extracted index sets
-        lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1,3,2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
-        wgdx.lst(paste0(nm, "_stats.gdx"), lst)
-        
-    }else{
-        stop("Function export2gdx not yet set-up for more than 3 dimensions")
-    }
-    }else{
-        if(ndim==2){
-            
-            symDim <- 3
-            attr(x2gdx_noNA,"symName") <- nm
-            attr(x2gdx_noNA, "ts") <- paste0("Mean values for ", nm)    #explanatory text for the symName
-            myText <- c("spatial unit", "variables", "value")     # explanatory text for the extracted index sets
-            lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1,2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
-            wgdx.lst(paste0(nm, "_stats.gdx"), lst)
-
-        }else
-        if(ndim==4){
-            
-            symDim <- 5
-            attr(x2gdx_noNA,"symName") <- nm
-            attr(x2gdx_noNA, "ts") <- paste0("Mean values for ", nm)    #explanatory text for the symName
-            myText <- c("spatial unit","year","pointid", "variables", "value")     # explanatory text for the extracted index sets
-            lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1,4,3,2,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
-            wgdx.lst(paste0(nm, "_stats.gdx"), lst)
-
-        }
-    }
+    nm <- tolower(parn)
+    if(is.null(pardesc)) pardesc<-paste0("Data for ", nm) 
+    
+    symDim<-ndim+1
+    attr(x2gdx_noNA,"symName") <- nm
+    attr(x2gdx_noNA, "ts") <- pardesc   #explanatory text for the symName
+    if(is.null(myvars)) myvars<-paste0("variables",c(1:(ndim-1)))
+    #print(myvars)
+    myText<-c("Spatial units: CAPRI-NUTS0, CAPRI-NUTS2, Gisco-NUTS3, HSU",
+              myvars,
+              paste0("Statistics calculated on the basis of uscie (HSU) or HSU (regions). ",
+                     "For HSU value refers to the direct value if available or average over uscie. ",
+                     "For regions, value is the area-weighted average."))
+    lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1:ndim,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+    wgdx.lst(paste0(nm, "_stats.gdx"), lst)
 } #end of export2gdx
 
 
