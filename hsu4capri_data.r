@@ -7,15 +7,23 @@ doirri<-0
 dosoil<-0
 dolucas<-0
 docorine<-0
-
 dodeposition<-0
-
-
 dometeo<-0
-domarsyield<-0
+
 docentroids<-0
 
+domarsyield<-0
 
+
+
+
+
+if(docentroids==1){
+    #### FOREST SHARE ####
+    #This dataset contains forest share data at USCIE level
+    xresult<-processdata(xfulln = paste0(usciedatapath,"HSU2_CENTER_COORDINATES.csv"),
+                         spatunit = "hsu",parn = "p_center")
+}
 if(doforest==1){
     #### FOREST SHARE ####
     #This dataset contains forest share data at USCIE level
@@ -46,7 +54,17 @@ if(dolucas==1){
 }
 
 if(dodeposition==1){
-    xresult<-processdata(xfulln = paste0(usciedatapath,"USCIE_EMEP_LC_HSU2_W-DDP.rdata"),spatunit="hsu",xvbles="EMEPdep")
+    xresult<-processdata(xfulln = paste0(usciedatapath,"USCIE_EMEP_LC_HSU2_W-DDP.rdata"),spatunit="hsu",xvbles="EMEPdep",parn="p_emepdeposition")
+}
+if(dometeo==1){
+    metpath<-gsub("uscie","mars_grid_weather201207",usciedatapath)
+    metpath<-gsub("\\\\hsu2_database_update_2016_02orig","",metpath)
+    xresult<-processdata(xfulln = paste0(metpath,"marsmeteo.gdx"),spatunit="marsgrid",parn="p_marsmeteomonths")
+}
+if(domarsyield==1){
+    metpath<-gsub("uscie","marsyield",usciedatapath)
+    metpath<-gsub("\\\\hsu2_database_update_2016_02orig","",metpath)
+    xresult<-processdata(xfulln = paste0(metpath,"mars_yield.gdx"),spatunit="marsgrid",parn="p_marsyieldsmu")
 }
 
 

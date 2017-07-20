@@ -61,20 +61,22 @@ loadgdxfile<-function(xfulln, parname=NULL, sets=NULL){
     }
     #
     
-    if(ndim<4){
+    if(is.null(sets)){
         #rgdx returns i,j,... for each ndim and writes the values into the column 'value'
-        gdxl<-c("j","k","l","m") #xavi: for what is this?
+        #gdxl<-c("j","k","l","m") #xavi: for what is this?
         x <- as.data.table(rgdx.param(xfulln,parname))
         
-    }else if(ndim>3 && is.null(sets)){
-        
-        x <- as.data.table(rgdx.param(xfulln,parname))
-        print(head(x))
-        print(paste0("num of dims = ", ndim))
-        print(paste0("parameter name = ", parname))
-        stop("More than 3 dimensions, please choose which columns to be included (e.g. sets=c('i1'...))")
-        
-    }else if(ndim>3 && !is.null(sets)){
+    # }else if(ndim>3 && is.null(sets)){
+    #     
+    #     x <- as.data.table(rgdx.param(xfulln,parname))
+    #     print(head(x))
+    #     print(paste0("num of dims = ", ndim))
+    #     print(paste0("parameter name = ", parname))
+    #     stop("More than 3 dimensions, please choose which columns to be included (e.g. sets=c('i1'...))")
+    #     
+    }else 
+        #if(ndim>3 && !is.null(sets))
+        {
         
         x <- as.data.table(rgdx.param(xfulln,parname))
         #x <- x[, .(sets)]
@@ -172,20 +174,13 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
         ndim<-x[[2]]
         parn<-x[[3]]
         xloaded<-x[[1]]
-        names(xloaded)[ndim+1]<-"value"
         xvbles<-"value"
-        if(ndim==3){
-            names(xloaded)[1] <- "i"
-            names(xloaded)[3] <- "j"
-            names(xloaded)[2] <- "k" 
-        }
-        setnames(xloaded,old<-c("i"),new<-c(spatunit))
+        setnames(xloaded,names(xloaded)[1:ndim],c(spatunit,letters[10:(10+ndim-2)]))
         
         if(spatunit=="hsu"){
             xhsu<-xloaded
             names(xhsu)[1] <- "hsu"
             xhsu$hsu <- gsub("U", "", xhsu$hsu)
-            
         }
     }else if(fileext=="csv"){
         print("Loading csv file...")
@@ -198,7 +193,7 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
         setnames(xloaded,old=origvar,new=spatunit)
         
         if("MU_GLOBAL"%in%colnames(xloaded)) xloaded<-xloaded[,-"MU_GLOBAL",with=FALSE]
-        print(xvbles)
+        #print(xvbles)
         if(!is.null(xvbles)){
             xloaded<-xloaded[,which(colnames(xloaded)%in%c("s_uscierc",xvbles)),with=FALSE]
         }else{
@@ -223,66 +218,26 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
             #ndim<-2
             functs<-c("mean","median","min","max")
             xvbles<-"fraction"
-            
         }
-        if(xvbles[1]=="dep") {
-            x <- loadcsv(xfulln, xvbles)
-            ndim<-x[[2]]
-            parn<-x[[3]]
-            xloaded<-x[[1]]
-        }
-    }else if(fileext=="rdata"){
-        load(xfulln)
-        if(xvbles=="EMEPdep"){
-            
-            # File preprocessed with \\ies-ud01.jrc.it\D5_agrienv\Data\uscie\hsu2_database_update_2016_02orig\USCIE_EMEP_HSU2.r
-            # loaded.
-            
-            # Remove cols that are not needed here
-            xloaded<-emepdep[,c("hsu","dep","cmp","06","07","08","09","10","frac_hsu")]
-            xloaded<-melt(xloaded,measure.vars = c("06","07","08","09","10"),value.name = xvbles,variable.name = "year")
-            xloaded$EMEPdep<-xloaded$EMEPdep*xloaded$frac_hsu
-            xloaded<-as.data.table(summarise_at(group_by(xloaded,hsu,dep,cmp,year),"sharedep","sum", na.rm=TRUE))
-            
-            ndim<-4
-            parn<-"p_emepdeposition"
-            
-            orignames<-c("dep","cmp","year")
-            newnames<-c("j","k","l")
-            setnames(xloaded,orignames,newnames)
-            # Now set column names as they shoudl apprear in the gdx file
-            orignames<-c("WetOrDryDep","Compound","Year")
-            origexpl<-c("Indicates if value refers to wet (WDEP) or dry (DDEP) deposition.",
-                        "Deposited compound: OXN: oxidized nitrogen, RDN: reduced nitrogen, SOX: oxidized sulphur.",
-                        "Year")
-            
-            
-        }
+    }else if(fileext=="rdata"){load(xfulln)
     }else{
         stop(paste0("No loading procedure for files with extension ",fileext," has been developed yet..."))
     }
     
-    save(ndim,parn,xloaded,spatunit,functs,file="dem.rdata")
+    rm(uscie_hsu)
+    xloaded<-droplevels(xloaded)
+    source("hsu4capri_defpars.r")
+    save(ndim,parn,xloaded,spatunit,functs,orignames,newnames,origexpl,file="235.rdata")
     
     #functs=c("max", "min", "mean", "sd", "median")
     if(spatunit=="s_uscierc"){  
-        
-        #save(xloaded,spatunit,xfrom=spatunit,xvbles,ndim,functs,file="xloaded336.rdata")
         xlinked<-linkxto2xfrom(x2agg=xloaded,xfrom=spatunit,xto="hsu")
         xhsu<-agguscie2hsu(xlinked,xfrom=spatunit,xto="hsu",xvbles = xvbles,ndim=ndim,functs=functs)
-        
+    }else if(spatunit=="marsgrid"){
+        xhsu<-linkxto2xfrom(x2agg=xloaded,xfrom=spatunit,xto="hsu")
+        xvbles<-"value"
     }else if(spatunit=="mu_global"){
-        
-        hsudef<-fread(paste0(usciedatapath,"HSU2_DEFPARAM.csv"))
-        hsudef<-select(hsudef,HSU2_IDRUN,MU_GLOBAL,SMU)
-        setnames(hsudef,old="HSU2_IDRUN",new="hsu")
-        setnames(hsudef,old="MU_GLOBAL",new=spatunit)
-        hsudef2<-hsudef[mu_global%in%xloaded$mu_global]
-        setkey(hsudef,mu_global)
-        xloaded$mu_global<-as.numeric(as.character(xloaded$mu_global))
-        xloaded<-xloaded[complete.cases(xloaded)]
-        setkey(xloaded,mu_global)
-        xloaded2<-merge(hsudef,xloaded,by="mu_global",all.x=TRUE)
+        xhsu<-linkxto2xfrom(x2agg=xloaded,xfrom=spatunit,xto="hsu")
     }else if(spatunit=="hsu"){
         xhsu<-xloaded
     }
@@ -291,22 +246,35 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
     # Assumption here that regardless the initial unit, at this point we have hsu and 
     # are continuing from this common 'milestone'
     unittoagg<-"hsu"   #xavi: if you define it here, always will be hsu (if...else doesn't make sense)
-    xstart <- preparedata(xhsu)
+    xstart<-preparedata(xhsu)
+    xstart<-xstart[complete.cases(xstart)]
     #xstart<-xstart[!is.na(xstart$value)]
     
     # Aggregation from HSU to administrative regions must be area-weighted
     # If already some specific 'mean' had been defined leave it as is
     if("mean"%in%functs) {functs <- replace(functs, functs=="mean", "weighted.mean(., area)")}
-    save(xstart,functs,xvbles,ndim,xfrom,xto,file="xstart339.rdata")
+    # Only exception is the center of the units. Here keep "mean" (as only aggregation function)
+    if(parn=="p_center"){functs<-"mean"}
+    save(xstart,functs,xvbles,ndim,xfrom,xto,orignames,newnames,file="xstart339.rdata")
     xnuts3<-agguscie2hsu(xstart,xfrom="hsu",xto="nuts3",xvbles=xvbles,ndim=ndim,functs=functs)
     xnuts2<-agguscie2hsu(xstart,xfrom="hsu",xto="CAPRI_NUTSII",xvbles=xvbles,ndim=ndim,functs=functs)
     xnuts0<-agguscie2hsu(xstart,xfrom="hsu",xto="CAPRI_NUTS0" ,xvbles=xvbles,ndim=ndim,functs=functs)
     
-    #xnuts3<-xnuts3[!is.infinite(xnuts3$max)]
-    #xnuts2<-xnuts2[!is.infinite(xnuts2$max)]
-    #xnuts0<-xnuts0[!is.infinite(xnuts0$max)]
-    save(xnuts0,xnuts2,xnuts3,xhsu,xfields, file=paste0(parn,".rdata"))
+    if(parn=="p_center") {
+        xx <-alldistances(xtmp=list(xhsu,xnuts3,xnuts2,xnuts0))
+        xhsu<-xx[[1]]
+        xnuts3<-xx[[2]]
+        xnuts2<-xx[[3]]
+        xnuts0<-xx[[4]]
+        ndim<-5
+        orignames<-NULL
+    }else if(parn="p_marsmeteomonths"){
+        xmeteo<-meteoquartals(xhsu)
+        
+    }
     
+    save(xnuts0,xnuts2,xnuts3,xhsu,xfields, file=paste0(parn,".rdata"))
+        
     # Prepare to export to gdx file for CAPRI
     colnames(xnuts3)[1]<-"spatial_unit"
     colnames(xnuts2)[1]<-"spatial_unit"
@@ -315,67 +283,41 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
     
     xhsu$hsu<-paste0("U",xhsu$hsu)
     colnames(xhsu)[1]<-"spatial_unit"
-    xall<-rbind(xnuts0,xnuts2,xnuts3,xhsu,fill=TRUE)
-    # if(spatunit=="s_uscierc"){
-    #     xall<-rbind(xnuts0,xnuts2,xnuts3,xhsu,fill=TRUE)
-    # }else{  
-    #     xall<-rbind(xnuts0,xnuts2,xnuts3)
-    #     #xallstats<-melt(xall,"spatial_unit",)
-    # }
     
-    if(xvbles=="EMEPdep"){
-        setnames(xall,newnames,orignames)
-    }else if(ndim==2) {setnames(xall,old="j",new="variables")
-    }else if(ndim==3) {setnames(xall,old=c("j", "k"), new=c("spatial_unit2", "variables"))}
+    if(any(colnames(xhsu)=="min") | parn=="p_center"){
+        xall<-rbind(xnuts0,xnuts2,xnuts3,xhsu,fill=TRUE)
+    }else{
+        xall<-rbind(xnuts0,xnuts2,xnuts3)
+    }
     
     if(any(colnames(xall)=="fraction")) setnames(xall,"fraction","value")
+    
+    # For EMEP deposition
+    if(any(colnames(xall)=="EMEPdep")) xall$l<-droplevels(xall$l)
+    if(any(colnames(xall)=="EMEPdep")) setnames(xall,"EMEPdep","value")
+    if(parn=="p_center")f<-c("spatial_unit","nuts3","nuts2","CAPRI_NUTSII","CAPRI_NUTS0")
+    if(parn=="p_center")xall<-xall[,c(f,setdiff(colnames(xall),f)),with=FALSE]
+    
     if(!parn%in%c("p_domstutop")){
         #statistical moments exist
-        export2gdx(xall, ndim=ndim, parn=parn,pardesc=pardescription(parn),vars=orignames,myvars = origexpl)  # to export to gdx
+        if(any(colnames(xhsu)=="min"|parn=="p_center")){
+            export2gdx(xall, ndim=ndim, parn=parn,pardesc=pardescription(parn),vars=orignames,myvars = origexpl)  # to export to gdx
+        }else{
+            # If there are no statistics on hsu-level, save separately (to save memory space)
+            export2gdx(xall, ndim=ndim, parn=paste0(parn,"nuts"),pardesc=pardescription(parn),vars=orignames,myvars = origexpl)  # to export to gdx
+            export2gdx(xhsu, ndim=ndim, parn=paste0(parn,"hsu") ,pardesc=pardescription(parn),vars=orignames,myvars = origexpl)  # to export to gdx
+        }
     }else{
         #for soil, too many parameters, only mean is saved
         gall<-melt(xall,"spatial_unit",xvbles,"variables","value")
         ghsu<-melt(xhsu,"spatial_unit",xvbles,"variables","value")
-        gall<-rbind(gall,ghsu)
+        xall<-rbind(gall,ghsu)
         export2gdx(xall, ndim=2, parn=parn,statistics = 0)  # to export to gdx
     }
     
     return(list(xall,xnuts0,xnuts2,xnuts3,xhsu,xstart))
 } #end of processdata
 
-
-## Exporting to a gdx file with ##
-
-#export2gdx<-function(x2gdx, ndim=ndim, xfulln=xfulln, parn=parn){
-export2gdx<-function(x2gdx, ndim=ndim, parn=parn,statistics=1,pardesc=NULL,vars=NULL,myvars=NULL){
-    
-    print("Exporting to a gdx file...")
-    x2gdx_noNA <- x2gdx[complete.cases(x2gdx)]  # to remove NA's
-    x2gdx_noNA <- as.data.frame(x2gdx_noNA)
-    x2gdx_noNA <- droplevels(x2gdx_noNA)
-    
-    if(! is.null(vars)&ndim>1){
-        # Rename columns
-        oldn<-names(x2gdx_noNA)[which(names(x2gdx_noNA)==letters[10:(10+ndim-2)])]
-        setnames(x2gdx_noNA,letters[10:(10+ndim-2)],vars)
-    }
-    
-    nm <- tolower(parn)
-    if(is.null(pardesc)) pardesc<-paste0("Data for ", nm) 
-    
-    symDim<-ndim+1
-    attr(x2gdx_noNA,"symName") <- nm
-    attr(x2gdx_noNA, "ts") <- pardesc   #explanatory text for the symName
-    if(is.null(myvars)) myvars<-paste0("variables",c(1:(ndim-1)))
-    #print(myvars)
-    myText<-c("Spatial units: CAPRI-NUTS0, CAPRI-NUTS2, Gisco-NUTS3, HSU",
-              myvars,
-              paste0("Statistics calculated on the basis of uscie (HSU) or HSU (regions). ",
-                     "For HSU value refers to the direct value if available or average over uscie. ",
-                     "For regions, value is the area-weighted average."))
-    lst <- wgdx.reshape(x2gdx_noNA, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1:ndim,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
-    wgdx.lst(paste0(nm, "_stats.gdx"), lst)
-} #end of export2gdx
 
 
 
@@ -430,6 +372,7 @@ if(! "uscie_hsu"%in%ls()){
         
         hsu2export <- hsu2_nuts[complete.cases(hsu2_nuts), ]  # to remove NA's
         hsu2export$hsu<-paste0("U",hsu2export$hsu)
+        hsu2export$area<-hsu2export$area/1000000
         
         symDim <- 7
         attr(hsu2export,"symName") <- "hsu_nuts_capri"
@@ -437,22 +380,44 @@ if(! "uscie_hsu"%in%ls()){
         myText <- c("country code","nuts2 code of capri","nuts2 code","soil mapping unit","nuts3 code","hsu2 code","area of hsu2")     # explanatory text for the extracted index sets
         lst <- wgdx.reshape(hsu2export, symDim,tName = "area", setsToo=FALSE,order=c(7,6,5,4,2,1,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
         
+        hsu2_nuts$area<-hsu2_nuts$area/1000000
+        xhsu<-hsu2_nuts[,.(hsu,area)]
+        xhsu$hsu<-paste0("U",xhsu$hsu)
+        xnuts3<-agguscie2hsu(hsu2_nuts,xfrom="hsu",xto="nuts3",xvbles="area",ndim=1,functs="sum")
+        xnuts2g<-agguscie2hsu(hsu2_nuts,xfrom="hsu",xto="nuts2",xvbles="area",ndim=1,functs="sum")
+        xnuts2<-agguscie2hsu(hsu2_nuts,xfrom="hsu",xto="CAPRI_NUTSII",xvbles="area",ndim=1,functs="sum")
+        xnuts0<-agguscie2hsu(hsu2_nuts,xfrom="hsu",xto="CAPRI_NUTS0" ,xvbles="area",ndim=1,functs="sum")
+        setnames(xhsu,"hsu","spatial_unit")
+        setnames(xnuts3,"nuts3","spatial_unit")
+        setnames(xnuts2g,"nuts2","spatial_unit")
+        setnames(xnuts2,"CAPRI_NUTSII","spatial_unit")
+        setnames(xnuts0,"CAPRI_NUTS0","spatial_unit")
+        areas<-rbind(xnuts0,xnuts2,xnuts2g,xnuts3,xhsu)
+        symDim <- 2
+        attr(areas,"symName") <- "p_area"
+        attr(areas, "ts") <- "Areas for HSU, NUTS3, CAPRI_NUTSII, CAPRI_NUTS0"   #explanatory text for the symName
+        myText <- c("spatial_unit","area")     # explanatory text for the extracted index sets
+        lst2 <- wgdx.reshape(areas, symDim,tName = "area", setsToo=FALSE,order=c(1,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+        
+        
         # Add sets to include
         shsu<-hsu2export$hsu
-        hsu2set<-list(name='s_hsu',ts='List of HSU codes',uels=list(shsu),type='set',ndim=1,form='full')
+        hsu2set<-list(name='s_hsu',ts='List of HSU codes',uels=list(shsu),type='set',dim=1,form='full')
         ssmu<-unique(hsu2export$SMU)
-        smuset<-list(name='s_smu',ts='List of soil mapping units',uels=list(ssmu),type='set',ndim=1,form='full')
+        smuset<-list(name='s_smu',ts='List of soil mapping units',uels=list(ssmu),type='set',dim=1,form='full')
+        
+        
         
         nutsexport<-unique(hsu2export[,.(nuts2,CAPRI_NUTSII,CAPRI_NUTS0,nHSU=.N,areanuts3_km2=sum(area/1000000)),by=nuts3])
         snuts3<-nutsexport$nuts3
-        nuts3set<-list(name='s_nuts3',ts='List of ADMIN_EEZ codes, level NUTS3',uels=list(snuts3),type='set',ndim=1,form='full')
+        nuts3set<-list(name='s_nuts3',ts='List of ADMIN_EEZ codes, level NUTS3',uels=list(snuts3),type='set',dim=1,form='full')
         snuts2<-nutsexport$nuts2
-        nuts2set<-list(name='s_nuts2',ts='List of ADMIN_EEZ codes, level nuts2',uels=list(snuts2),type='set',ndim=1,form='full')
+        nuts2set<-list(name='s_nuts2',ts='List of ADMIN_EEZ codes, level nuts2',uels=list(snuts2),type='set',dim=1,form='full')
         
         scaprinuts2<-unique(nutsexport$CAPRI_NUTSII)
-        scaprinuts2set<-list(name='s_srnuts2',ts='List of CAPRI NUTS2 available for HSU',uels=list(scaprinuts2),type='set',ndim=1,form='full')
+        scaprinuts2set<-list(name='s_srnuts2',ts='List of CAPRI NUTS2 available for HSU',uels=list(scaprinuts2),type='set',dim=1,form='full')
         scapricountries<-unique(nutsexport$CAPRI_NUTS0)
-        scapricountriesset<-list(name='s_countries',ts='List of CAPRI countries available for HSU',uels=list(scapricountries),type='set',ndim=1,form='full')
+        scapricountriesset<-list(name='s_countries',ts='List of CAPRI countries available for HSU',uels=list(scapricountries),type='set',dim=1,form='full')
         
         mnuts3nuts2<-unique(nutsexport[,.(nuts3,nHSU,areanuts3_km2),by=nuts2])
         mnuts3nuts2$nHSU<-as.numeric(mnuts3nuts2$nHSU)
@@ -478,10 +443,11 @@ if(! "uscie_hsu"%in%ls()){
         attr(mnuts0, "ts") <- "Map between ADMIN_EEA codes between level NUTS3 and CAPRI NUTS2"
         mn <- wgdx.reshape(mnuts0, symDim=2,tName = "pnuts3", setsToo=FALSE,order=NULL)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
         
-        wgdx.lst("hsu2_nuts1", lst,hsu2set,nuts3set,nuts2set,smuset,scaprinuts2set,scapricountriesset,mn3,mn2,mn0,mn)
+        wgdx.lst("hsu2_nuts1", lst,lst2,hsu2set,nuts3set,nuts2set,smuset,scaprinuts2set,scapricountriesset,mn3,mn2,mn0,mn)
+        #wgdx.lst("hsu2_nuts1", lst,hsu2set)
         
         ### 6., Save data in rdata format ####
-        save(hsu2_nuts,uscie_hsu,marsgrid_hsu,mnuts3nuts2,mnuts3srnuts2,msrnuts2nuts0,mnuts0,file=dataprep)
+        save(hsu2_nuts,uscie_hsu,marsgrid_hsu,mnuts3nuts2,mnuts3srnuts2,msrnuts2nuts0,mnuts0,areas,file=dataprep)
         rm(hsu2export,uscie_marsgrid)
         
     }else{
