@@ -268,7 +268,7 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
         xnuts0<-xx[[4]]
         ndim<-5
         orignames<-NULL
-    }else if(parn="p_marsmeteomonths"){
+    }else if(parn=="p_marsmeteomonths"){
         xmeteo<-meteoquartals(xhsu)
         
     }
@@ -405,8 +405,6 @@ if(! "uscie_hsu"%in%ls()){
         hsu2set<-list(name='s_hsu',ts='List of HSU codes',uels=list(shsu),type='set',dim=1,form='full')
         ssmu<-unique(hsu2export$SMU)
         smuset<-list(name='s_smu',ts='List of soil mapping units',uels=list(ssmu),type='set',dim=1,form='full')
-        
-        
         
         nutsexport<-unique(hsu2export[,.(nuts2,CAPRI_NUTSII,CAPRI_NUTS0,nHSU=.N,areanuts3_km2=sum(area/1000000)),by=nuts3])
         snuts3<-nutsexport$nuts3

@@ -7,6 +7,7 @@ doirri<-0
 dosoil<-0
 dolucas<-0
 docorine<-0
+dofssgrid<-0
 dodeposition<-0
 dometeo<-0
 
@@ -46,6 +47,38 @@ if(dosoil==1){
 }
 if(docorine==1){
     xresult<-processdata(xfulln = paste0(usciedatapath,"USCIE_PARAM.csv"),xvbles = "LC1_ID",parn="CLC_fraction")
+}
+if(dofssgrid==1){
+    #xresult<-processdata(
+    xfulln = "C:/adrian/google/projects/fss2010gridded/final_data/USCIE_GRID10_NUTS2_3_HSU_NOGOAREA.csv"
+    print("Loading csv file...")
+    xloaded<-fread(xfulln, header=TRUE)
+    x<-xloaded[,.N,by=c("HSU2_IDRUN","USCIE_GRID10_NUTS2_3","HSU2_CD_NG")]
+    x<-x[!grepl("^ ",USCIE_GRID10_NUTS2_3)]
+    z<-as.data.table(dcast(x,HSU2_IDRUN+USCIE_GRID10_NUTS2_3~HSU2_CD_NG,value.var="N"))
+    setnames(z,c("0","1","HSU2_IDRUN","USCIE_GRID10_NUTS2_3"),c("GO","nogo","s_hsu","grid10n23"))
+    z[is.na(z)]<-0
+    z<-z[,area:=GO+nogo]
+    z<-z[,hsuarea:=sum(area),by="s_hsu"]
+    z<-z[,gridarea:=sum(area),by="grid10n23"]
+    z<-z[,fracHSU:=area/hsuarea]
+    z<-z[,.SD,.SDcols=c("s_hsu","grid10n23","nogo","area","gridarea","fracHSU")]
+    z$s_hsu<-paste0("U",z$s_hsu)
+    export2gdx(z,ndim=2,parn="p_hsu_grid10n23",statistics=0,
+               pardesc="Mapping between FSS 10 km grid at NUTS2 level",
+               mydim1exp="HSU",
+               myvars="Uscie-bsed overlay of 10 km grid cells with FSS-NUTS3 regions",
+               myvarsexp="Parameter with mapping between HSU and 10kmNuts23 grids. Area=unit area. fracHSU=fraction of HSU in gridcell (gridcellarea).",
+               varname="fssgridpars")
+    z$nuts3<-unlist(lapply(strsplit(z$grid10n23,"_10kmE"),function(x) x[[1]]))
+    a<-unique(z[,.SD,.SDcols=c("grid10n23","nuts3")])
+    a$set<-paste0(a$grid10n23,"  .  ",a$nuts3)
+    setkey(x=a,set)
+    currun<-file("m_hsu_fss10kmnuts2.gms",open="wt")
+    cat("set m_grid10_n23(*,*) 'Mapping between FSS 10 km grid at NUTS2-3 level' /",file=currun)
+    write.table(a$set,file=currun,quote=FALSE,row.names=FALSE)
+    cat("/;",file=currun)
+    close(currun)
 }
 if(dolucas==1){
     xresult<-getlucas(xfulln = paste0(usciedatapath,"../lucas/LUCAS09EU23_USCIERC.csv"),

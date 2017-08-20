@@ -213,7 +213,17 @@ agguscie2hsu<-function(x2agg,xfrom,xto,xvbles,ndim,functs){
 ## Exporting to a gdx file with ##
 
 #export2gdx<-function(x2gdx, ndim=ndim, xfulln=xfulln, parn=parn){
-export2gdx<-function(x2gdx, ndim=ndim, parn=parn,statistics=1,pardesc=NULL,vars=NULL,myvars=NULL){
+export2gdx<-function(x2gdx, 
+                     parn=parn,   # Parameter name in the gdx file
+                     pardesc=NULL,# Description of the parameter
+                     ndim=ndim,   # Dimension. Note that it will increased by one
+                     statistics=1,
+                     vars=NULL,   # Vector with variable names. If NULL the column names will be used
+                                  # Use only for statistics.
+                     mydim1exp=NULL, #Explanatory text for 1st dim. If null assumes all spatial units
+                     myvars=NULL,    #Explanatory text for other dims
+                     myvarsexp=NULL, #Explanatory text for vars. If NULL assumes statistical parameters (mean,min, max,median)
+                     varname=NULL){
     
     print("Exporting to a gdx file...")
     x2gdxloc <- x2gdx[complete.cases(x2gdx)] # to remove NAs
@@ -222,9 +232,9 @@ export2gdx<-function(x2gdx, ndim=ndim, parn=parn,statistics=1,pardesc=NULL,vars=
     
     if(! is.null(vars)&ndim>1){
         # Rename columns
-        #print(names(x2gdxloc))
-        #print(letters[10:(10+ndim-2)])
-        #print(vars)
+        print(names(x2gdxloc))
+        print(letters[10:(10+ndim-2)])
+        print(vars)
         oldn<-names(x2gdxloc)[which(names(x2gdxloc)%in%letters[10:(10+ndim-2)])]
         setnames(x2gdxloc,letters[10:(10+ndim-2)],vars)
     }
@@ -235,14 +245,17 @@ export2gdx<-function(x2gdx, ndim=ndim, parn=parn,statistics=1,pardesc=NULL,vars=
     symDim<-ndim+1
     attr(x2gdxloc,"symName") <- nm
     attr(x2gdxloc, "ts") <- pardesc   #explanatory text for the symName
-    if(is.null(myvars)) myvars<-paste0("variables",c(1:(ndim-1)))
     #print(myvars)
-    myText<-c("Spatial units: CAPRI-NUTS0, CAPRI-NUTS2, Gisco-NUTS3, HSU",
+    if(is.null(mydim1exp)) mydim1exp<-"Spatial units: CAPRI-NUTS0, CAPRI-NUTS2, Gisco-NUTS3, HSU"
+    if(is.null(myvars)) myvars<-paste0("variables",c(1:(ndim-1)))
+    if(is.null(myvarsexp)) myvarsexp<-paste0("Statistics calculated on the basis of uscie (HSU) or HSU (regions). ",
+                                             "For HSU value refers to the direct value if available or average over uscie. ",
+                                             "For regions, value is the area-weighted average.")
+    myText<-c(mydim1exp,
               myvars,
-              paste0("Statistics calculated on the basis of uscie (HSU) or HSU (regions). ",
-                     "For HSU value refers to the direct value if available or average over uscie. ",
-                     "For regions, value is the area-weighted average."))
-    lst <- wgdx.reshape(x2gdxloc, symDim, tName = "s_statistics", setsToo=TRUE, order=c(1:ndim,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+              myvarsexp)
+    if(is.null(varname)) varname="s_statistics"
+    lst <- wgdx.reshape(x2gdxloc, symDim, tName = varname, setsToo=TRUE, order=c(1:ndim,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
     wgdx.lst(paste0(nm, "_stats.gdx"), lst)
 } #end of export2gdx
 
