@@ -63,5 +63,18 @@ if(parn=="p_emepdeposition"){
     origexpl<-xmetadata$DESCRIPTION[which(xmetadata$FIELD%in%xvbles)]
     orignames<-c(xvbles,c("distnuts3km","distCAPRI_NUTSIIkm","distCAPRI_NUTS0km"))
     newnames<-letters[10:(10+6-2)]
+}else if(parn=="p_rusle"){
+    
+    ndim<-1#Will be grouped just by hsu
+    orignames<-xvbles
+    newnames<-xvbles
+    #setnames(xloaded,orignames,newnames)
+    origexpl<-c(paste0("LSfactor: Slope Length and Steepness factor, ",
+                       "Rfactor: Rainfall Erosivity, ",
+                       "KSTfactor: Soil Erodibility incorporating stoniness. "
+                       )
+    )
+    orignames<-xvbles
+    newnames<-letters[10:(10+6-2)]
     
 }

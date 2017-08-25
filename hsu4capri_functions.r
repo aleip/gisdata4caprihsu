@@ -1,11 +1,15 @@
-linkxto2xfrom<-function(x2agg,xfrom,xto){
+linkxto2xfrom<-function(x2agg,xfrom,xto,onlycomplete=1){
     
     if(xfrom=="s_uscierc"){
         print(paste0("Linking ", xfrom, " data with ", xto))
         x2agg$s_uscierc<-as.integer(as.character(x2agg$s_uscierc))
         setkey(x2agg,s_uscierc)
         xhsu<-xhsu<-x2agg[uscie_hsu]   # merge HSU (left join)
-        x2agg<-xhsu[complete.cases(xhsu)]
+        if(onlycomplete==1) {
+            x2agg<-xhsu[complete.cases(xhsu)]
+        }else{
+            x2agg<-xhsu
+        }
         
     }else if(xfrom=="marsgrid"){
         print(paste0("Linking ", xfrom, " data with ", xto))
@@ -180,7 +184,11 @@ agguscie2hsu<-function(x2agg,xfrom,xto,xvbles,ndim,functs){
             lets<-letters[10:(10+ndim-2)]
             for(i in 1:length(xvbles)){
                 colnames(xtemp)[which(colnames(xtemp)==xvbles[i])]<-"value"
-                xres2 <- ddply(xtemp, c(lets,"xto"), function(X) data.frame(value = weighted.mean(X$value, X$area)))
+                if(ndim==1){
+                    xres2 <- ddply(xtemp, c("xto"), function(X) data.frame(value = weighted.mean(X$value, X$area)))
+                }else{
+                    xres2 <- ddply(xtemp, c(lets,"xto"), function(X) data.frame(value = weighted.mean(X$value, X$area)))
+                }
                 xres <- cbind(xres, xres2$value)
                 setnames(xres, "V2","value")
                 colnames(xres)[which(colnames(xres)=="value")]<-xvbles[i]
@@ -325,6 +333,10 @@ pardescription<-function(parn=NULL){
         description<-paste0("MARS potential and water-limited yield for some crops.")
     }else if(parn=="p_center"){
         description<-paste0("Center of gravity and distance to HSU")
+    }else if(parn=="p_rulse"){
+        description<-paste0("Factors for Revised Universal Soil Loss Equation (RUSLE) to estimate soil erosion",
+                            "Data downloaded from http://esdac.jrc.ec.europa.eu/content/ls-factor-slope-length-and-steepness-factor-eu on 23.08.2017. ",
+                            "More information is available on website.")
     }
     
     return(description)

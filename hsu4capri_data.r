@@ -3,11 +3,14 @@ source("hsu4capri_functions.r")
 
 doforest<-0
 dodem<-0
+dorusle<-0
 doirri<-0
 dosoil<-0
 dolucas<-0
 docorine<-0
+
 dofssgrid<-0
+dopesetagrid<-0
 dodeposition<-0
 dometeo<-0
 
@@ -37,6 +40,21 @@ if(dodem==1){
                          xvbles = c("ALTITUDE_M","SLOPE_PERC"),
                          parn="p_uscierc_dem")
 }
+if(dorusle==1){
+    #### DIGITAL ELEVATION MODEL ####
+    #data incomplete - need to use new data from uscie
+
+    xloaded1<-fread(paste0(usciedatapath,"uscie_rusle_KSTfactor.csv"), header=TRUE)
+    xloaded2<-fread(paste0(usciedatapath,"uscie_rusle_LSfactor.csv"), header=TRUE)
+    xloaded3<-fread(paste0(usciedatapath,"uscie_rusle_Rfactor.csv"), header=TRUE)
+    xloaded4<-merge(xloaded1,xloaded2,by="USCIE_RC",all=TRUE)
+    xrusle<-merge(xloaded4,xloaded3,by="USCIE_RC",all=TRUE)
+    write.csv(xrusle,"rusle")
+    
+    xresult<-processdata(xfulln="rusle.csv",
+                         xvbles = c("LSfactor","Rfactor","KSTfactor"),
+                         parn="p_rusle")
+}
 if(doirri==1){
     xresult<-processdata(paste0(capridat,"uscie_irrishare.gdx"))
 }
@@ -50,7 +68,7 @@ if(docorine==1){
 }
 if(dofssgrid==1){
     #xresult<-processdata(
-    xfulln = "C:/adrian/google/projects/fss2010gridded/final_data/USCIE_GRID10_NUTS2_3_HSU_NOGOAREA.csv"
+    xfulln = "x:/adrian/google/projects/fss2010gridded/final_data/USCIE_GRID10_NUTS2_3_HSU_NOGOAREA.csv"
     print("Loading csv file...")
     xloaded<-fread(xfulln, header=TRUE)
     x<-xloaded[,.N,by=c("HSU2_IDRUN","USCIE_GRID10_NUTS2_3","HSU2_CD_NG")]
@@ -80,6 +98,11 @@ if(dofssgrid==1){
     cat("/;",file=currun)
     close(currun)
 }
+if(dopesetagrid==1){
+    #xresult<-processdata(
+    xfulln = paste0(usciedatapath,"uscie_peseta_grid.csv")
+    xresult<-processdata(xfulln = xfulln,xvbles = "PESETAidgrid",parn="PESETAgrid_fraction")}
+
 if(dolucas==1){
     xresult<-getlucas(xfulln = paste0(usciedatapath,"../lucas/LUCAS09EU23_USCIERC.csv"),
                          parn="lucas",

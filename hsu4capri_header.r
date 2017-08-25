@@ -140,7 +140,8 @@ getlucas<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,fun
 }
 
 gethsufraction<-function(xlinked,xvbles){
-    xlinked2<-xlinked[,.(count = .N),by=.(hsu,LC1_ID)]
+    if(xvbles=="LC1_ID") xlinked2<-xlinked[,.(count = .N),by=.(hsu,LC1_ID)]
+    if(xvbles=="PESETAidgrid") xlinked2<-xlinked[,.(count = .N),by=.(hsu,PESETAidgrid)]
     tmp<-xlinked2[,.(tot=sum(count)),by=.(hsu)]
     #setkey(xlinked2,"hsu")
     #setkey(tmp,"hsu")
@@ -151,10 +152,15 @@ gethsufraction<-function(xlinked,xvbles){
     #setnames(xlinked2,old="value",new=xvbles)
     xlinked<-xlinked2[,c("hsu",xvbles,"fraction"),with=FALSE]
     
-    lc1map<- fread(paste0(usciedatapath,"USCIE_PARAM_LC1_ID_CLC.csv"))
-    xloaded<- xlinked[lc1map,on="LC1_ID"] #merge(corine_uscie, LC1_ID_CLC, all.x = TRUE)
-    xloaded<-xloaded[,c("hsu","CLC","fraction")]
-    setnames(xloaded,"CLC","j")
+    if(xvbles=="LC1_ID"){
+        lc1map<- fread(paste0(usciedatapath,"USCIE_PARAM_LC1_ID_CLC.csv"))
+       xloaded<- xlinked[lc1map,on="LC1_ID"] #merge(corine_uscie, LC1_ID_CLC, all.x = TRUE)
+       xloaded<-xloaded[,c("hsu","CLC","fraction")]
+       setnames(xloaded,"CLC","j")
+    }else{
+        xloaded<-xlinked
+       setnames(xloaded,xvbles,"j")
+    }
     return(xloaded)    
 }
 
@@ -211,7 +217,7 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
             setkey(xloaded,"s_uscierc")
             xlinked<-xloaded[uscie_hsu]
         }
-        if(xvbles%in%c("LC1_ID")){
+        if("LC1_ID"%in%xvbles | "PESETAidgrid"%in%xvbles){
             print("# Required shares not average")
             xloaded<-gethsufraction(xlinked = xlinked,xvbles = xvbles)
             spatunit<-"hsu"
@@ -224,14 +230,13 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
         stop(paste0("No loading procedure for files with extension ",fileext," has been developed yet..."))
     }
     
-    rm(uscie_hsu)
     xloaded<-droplevels(xloaded)
     source("hsu4capri_defpars.r")
     save(ndim,parn,xloaded,spatunit,functs,orignames,newnames,origexpl,file="235.rdata")
     
     #functs=c("max", "min", "mean", "sd", "median")
     if(spatunit=="s_uscierc"){  
-        xlinked<-linkxto2xfrom(x2agg=xloaded,xfrom=spatunit,xto="hsu")
+        xlinked<-linkxto2xfrom(x2agg=xloaded,xfrom=spatunit,xto="hsu",onlycomplete=0)
         xhsu<-agguscie2hsu(xlinked,xfrom=spatunit,xto="hsu",xvbles = xvbles,ndim=ndim,functs=functs)
     }else if(spatunit=="marsgrid"){
         xhsu<-linkxto2xfrom(x2agg=xloaded,xfrom=spatunit,xto="hsu")
@@ -241,6 +246,7 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
     }else if(spatunit=="hsu"){
         xhsu<-xloaded
     }
+    rm(uscie_hsu)
     
     
     # Assumption here that regardless the initial unit, at this point we have hsu and 
@@ -291,12 +297,14 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
     }
     
     if(any(colnames(xall)=="fraction")) setnames(xall,"fraction","value")
-    
+    varname<-NULL
     # For EMEP deposition
     if(any(colnames(xall)=="EMEPdep")) xall$l<-droplevels(xall$l)
     if(any(colnames(xall)=="EMEPdep")) setnames(xall,"EMEPdep","value")
     if(parn=="p_center")f<-c("spatial_unit","nuts3","nuts2","CAPRI_NUTSII","CAPRI_NUTS0")
     if(parn=="p_center")xall<-xall[,c(f,setdiff(colnames(xall),f)),with=FALSE]
+    if(parn=="p_rusle")xhsu<-xhsu[,.SD,.SDcols=c("spatial_unit",xvbles)]
+    if(parn=="p_rusle")varname<-"s_rusle"
     
     if(!parn%in%c("p_domstutop")){
         #statistical moments exist
@@ -305,7 +313,7 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
         }else{
             # If there are no statistics on hsu-level, save separately (to save memory space)
             export2gdx(xall, ndim=ndim, parn=paste0(parn,"nuts"),pardesc=pardescription(parn),vars=orignames,myvars = origexpl)  # to export to gdx
-            export2gdx(xhsu, ndim=ndim, parn=paste0(parn,"hsu") ,pardesc=pardescription(parn),vars=orignames,myvars = origexpl)  # to export to gdx
+            export2gdx(xhsu, ndim=ndim, parn=paste0(parn,"hsu") ,pardesc=pardescription(parn),vars=orignames,myvars = origexpl,varname=varname)  # to export to gdx
         }
     }else{
         #for soil, too many parameters, only mean is saved
@@ -399,7 +407,55 @@ if(! "uscie_hsu"%in%ls()){
         myText <- c("spatial_unit","area")     # explanatory text for the extracted index sets
         lst2 <- wgdx.reshape(areas, symDim,tName = "area", setsToo=FALSE,order=c(1,0), setNames = myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
         
+        # gdx-file with sets hsu and mapping hsu-srnuts2
+        symDim <- 2
+        p_hsu_srnuts2<-hsu2_nuts[,.(hsu,CAPRI_NUTSII)]
+        p_hsu_srnuts2<-p_hsu_srnuts2[complete.cases(p_hsu_srnuts2)]
+        setnames(p_hsu_srnuts2,c("hsu","CAPRI_NUTSII"),c("hsu_all","caprinuts"))
+        p_hsu_srnuts2$hsu_all<-paste0("U",p_hsu_srnuts2$hsu_all)
+        p_hsu_srnuts2$yes<-1
+        p_hsu_srnuts2<-dcast(p_hsu_srnuts2,hsu_all~caprinuts,value.var="yes")
+        p_hsu_srnuts2[is.na(p_hsu_srnuts2)]<-0
+        attr(p_hsu_srnuts2,"symName") <- "p_hsu_srnuts2"
+        attr(p_hsu_srnuts2, "ts")     <- "Mapping between HSU and SRNUTS2 - saved as parameter as for wgdx.reshape constraints"   #explanatory text for the symName
+        myText <- c("All hsu which are associated with a currently availabel CAPRI NUTS2","CAPRI NUTS2 available in database")     # explanatory text for the extracted index sets
+        msrnuts2hsu <- wgdx.reshape(p_hsu_srnuts2,symDim=2,order=c(1,0),tName="caprinuts",setsToo=TRUE,setNames=myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+        wgdx.lst("p_hsu_srnuts2",msrnuts2hsu)
         
+        # gdx-file with sets hsu and mapping hsu-nuts3
+        symDim <- 2
+        p_hsu_nuts3<-hsu2_nuts[,.(hsu,CAPRI_NUTSII,nuts3)]
+        p_hsu_nuts3<-p_hsu_nuts3[complete.cases(p_hsu_nuts3)]
+        p_hsu_nuts3<-p_hsu_nuts3[!grepl("\\.",nuts3)]
+        #p_hsu_nuts3<-p_hsu_nuts3[!grepl(" ",nuts3)]
+        #p_hsu_nuts3<-p_hsu_nuts3[nuts3!=""]
+        #p_hsu_nuts3<-p_hsu_nuts3[!grepl("RUS|DZA|SYRSY|IRQ|BLR|MDA|UKR|AZEAZ|JOR|SAUSA|EGY|LBY|MAR|TUN",nuts3)]
+        #p_hsu_nuts3<-p_hsu_nuts3[!grepl("KAZA|LBN|GEO_|SRB|ISRI|ARMAM|PSE|ANDAD|BIH|KO-_|MNEME|ALB_AL|SMRSM",nuts3)]
+        p_hsu_nuts3<-p_hsu_nuts3[,.SD,.SDcols=c("hsu","nuts3")]
+        setnames(p_hsu_nuts3,c("hsu","nuts3"),c("hsu_all","n3"))
+        p_hsu_nuts3$hsu_all<-paste0("U",p_hsu_nuts3$hsu_all)
+        p_hsu_nuts3$set<-paste0(p_hsu_nuts3$n3,"   .   ",p_hsu_nuts3$hsu_all)
+        currun<-file("n3_hsu.gms",open="wt")
+        cat("set n3_hsu(*,*) 'Mapping between HSU and FSS NUTS3 regions - see https://github.com/aleip/gisdata4caprihsu' /",file=currun)
+        write.table(p_hsu_nuts3$set,file=currun,quote=FALSE,row.names=FALSE)
+        cat("/;",file=currun)
+        close(currun)
+        
+        # gdx-file with sets hsu and mapping hsu-srnuts2
+        symDim <- 3
+        p_smu_hsu<-hsu2_nuts[,.(hsu,SMU)]
+        p_smu_hsu<-p_smu_hsu[complete.cases(p_smu_hsu)]
+        setnames(p_smu_hsu,c("hsu"),c("hsu4smu"))
+        p_smu_hsu$hsu4smu<-paste0("U",p_smu_hsu$hsu4smu)
+        p_smu_hsu$yes<-1
+        attr(p_smu_hsu,"symName") <- "p_smu_hsu"
+        attr(p_smu_hsu, "ts")     <- "Mapping between HSU and SMU - saved as parameter as for wgdx.reshape constraints"   #explanatory text for the symName
+        myText <- c("SMU available in database",
+                    "All hsu which are associated with a SMU. Attention: this is more than hsu_all which are 'only' those with a CAPRI NUTS2 region"
+        )     # explanatory text for the extracted index sets
+        msrnuts2hsu <- wgdx.reshape(p_smu_hsu,symDim=3,order=c(2,1,0),setsToo=TRUE,setNames=myText)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
+        wgdx.lst("p_smu_hsu",msrnuts2hsu)
+
         # Add sets to include
         shsu<-hsu2export$hsu
         hsu2set<-list(name='s_hsu',ts='List of HSU codes',uels=list(shsu),type='set',dim=1,form='full')
@@ -441,7 +497,7 @@ if(! "uscie_hsu"%in%ls()){
         attr(mnuts0, "ts") <- "Map between ADMIN_EEA codes between level NUTS3 and CAPRI NUTS2"
         mn <- wgdx.reshape(mnuts0, symDim=2,tName = "pnuts3", setsToo=FALSE,order=NULL)   #to reshape the DF before to write the gdx. tName is the index set name for the new index position created by reshaping
         
-        wgdx.lst("hsu2_nuts1", lst,lst2,hsu2set,nuts3set,nuts2set,smuset,scaprinuts2set,scapricountriesset,mn3,mn2,mn0,mn)
+        wgdx.lst("hsu2_nuts1", lst,lst2,msrnuts2hsu,hsu2set,nuts3set,nuts2set,smuset,scaprinuts2set,scapricountriesset,mn3,mn2,mn0,mn)
         #wgdx.lst("hsu2_nuts1", lst,hsu2set)
         
         ### 6., Save data in rdata format ####
