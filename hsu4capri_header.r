@@ -19,7 +19,7 @@ if(Sys.info()[4]=="L01RI1203587"){ #checks machine name
     workpath<-"C:/adrian/tools/rprojects/gisdata4caprihsu/"
     capridat<-"C:/adrian/models/capri/trunk20160810/dat/capdis/hsu2/"
 }else if(Sys.info()[4]=="D01RI1600881"){ #checks machine name
-    gamspath<-"x:/GAMS/win64/24.4"
+    gamspath<-"x:/dev/GAMS/win64/24.8"
     workpath<-"x:/adrian/tools/rprojects/gisdata4caprihsu/"
     capridat<-"x:/adrian/models/capri/trunk20160810/dat/capdis/hsu2/"
     capridat<-"\\\\ies-ud01.jrc.it\\D5_agrienv\\Data\\uscie\\"
@@ -232,6 +232,7 @@ processdata<-function(xfulln,xvbles=NULL,newn="",spatunit="s_uscierc",parn=NULL,
     
     xloaded<-droplevels(xloaded)
     source("hsu4capri_defpars.r")
+    if(parn=="PESETAgrid_fraction")functs<-"sum"
     save(ndim,parn,xloaded,spatunit,functs,orignames,newnames,origexpl,file="235.rdata")
     
     #functs=c("max", "min", "mean", "sd", "median")

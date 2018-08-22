@@ -103,6 +103,11 @@ if(dopesetagrid==1){
     xfulln = paste0(usciedatapath,"uscie_peseta_grid.csv")
     xresult<-processdata(xfulln = xfulln,xvbles = "PESETAidgrid",parn="PESETAgrid_fraction")}
 
+    peseta<-fread(paste0(usciedatapath,"../../marsyield/yields_P3.csv"))
+    peseta<-peseta[,.SD,.SDcols=c("idgrid","crop_name","indicator","value")]
+    peseta<-as.data.table(dcast(peseta,idgrid+crop_name~indicator,value.var="value"))
+
+
 if(dolucas==1){
     xresult<-getlucas(xfulln = paste0(usciedatapath,"../lucas/LUCAS09EU23_USCIERC.csv"),
                          parn="lucas",

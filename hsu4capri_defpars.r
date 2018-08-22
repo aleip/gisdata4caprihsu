@@ -3,7 +3,9 @@
 
 # Is called when the "loading procedure" is done
 
-
+orignames<-xvbles
+newnames<-xvbles
+origexpl<-""
 # EMEP deposition
 
 if(parn=="p_emepdeposition"){
